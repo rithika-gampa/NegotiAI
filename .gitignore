@@ -1,0 +1,17 @@
+# Secrets — NEVER commit. Real API keys and the database URL live here.
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Generated at build time by build.js (npm start rebuilds them)
+public/app.built.js
+public/vendor/
+
+# Local tooling / editor
+.claude/
+.vscode/
+.idea/
+*.log

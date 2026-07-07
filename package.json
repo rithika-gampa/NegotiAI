@@ -1,0 +1,29 @@
+{
+  "name": "negotiai",
+  "version": "1.0.0",
+  "description": "AI-powered B2B quote generation and negotiation agent",
+  "main": "server/server.js",
+  "scripts": {
+    "build": "node build.js",
+    "prestart": "npm run build",
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "express-session": "^1.19.0",
+    "pg": "^8.22.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/preset-react": "^7.29.7",
+    "pg-mem": "^3.0.14"
+  }
+}
