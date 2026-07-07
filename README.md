@@ -127,3 +127,5 @@ public/
 
 - Never commit `.env` (it's gitignored) — API keys and `DATABASE_URL` live there.
 - All buyer/seller data access is authorized server-side per route; buyers can only see their own deals, sellers only their own products, deals, ledger, and audit trail.
+#   N e g o t i A I  
+ 
