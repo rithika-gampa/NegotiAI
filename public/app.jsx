@@ -1,23 +1,80 @@
 const { useState, useEffect, useRef } = React;
 
+// Lightweight toast system — a module-level pub/sub so any component can fire
+// a toast without prop-drilling a callback through the whole tree.
+const toastListeners = new Set();
+function showToast(message, type = "success") {
+  toastListeners.forEach((fn) => fn({ message, type }));
+}
+function ToastHost() {
+  const [toasts, setToasts] = useState([]);
+  useEffect(() => {
+    const listener = (t) => {
+      const id = Math.random().toString(36).slice(2);
+      setToasts((prev) => [...prev, { ...t, id }]);
+      setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 3200);
+    };
+    toastListeners.add(listener);
+    return () => toastListeners.delete(listener);
+  }, []);
+  return (
+    <div className="toast-host">
+      {toasts.map((t) => (
+        <div key={t.id} className={"toast " + t.type}>{t.message}</div>
+      ))}
+    </div>
+  );
+}
+
 const STYLES = `
   :root {
-    --ink: #14213D;
-    --paper: #F7F4EC;
+    --ink: #17293A;
+    --paper: #F1F6F5;
     --paper-raised: #FFFFFF;
-    --amber: #E8A33D;
-    --amber-deep: #C7822A;
-    --success: #2F6F4F;
+    --amber: #0D9488;
+    --amber-deep: #0B7D6E;
+    --success: #15803D;
     --danger: #B23A48;
-    --text: #3A3F4D;
-    --text-soft: #6B7080;
-    --line: #DCD6C6;
+    --text: #33414B;
+    --text-soft: #5F736E;
+    --line: #D8E4E1;
   }
   * { box-sizing: border-box; }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+  .toast-host {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .toast {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(20,33,61,0.28);
+    animation: toastIn 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    max-width: 340px;
+  }
+  .toast::before { font-size: 15px; }
+  .toast.success::before { content: "✓"; color: #7BD6A8; font-weight: 700; }
+  .toast.error { background: var(--danger); }
+  .toast.error::before { content: "!"; font-weight: 700; }
+  .toast.info::before { content: "•"; color: var(--amber); }
   body {
     margin: 0;
     background:
-      radial-gradient(1100px 520px at 85% -5%, rgba(232,163,61,0.13), transparent 60%),
+      radial-gradient(1100px 520px at 85% -5%, rgba(13,148,136,0.13), transparent 60%),
       radial-gradient(900px 480px at -10% 105%, rgba(20,33,61,0.07), transparent 55%),
       var(--paper);
     background-attachment: fixed;
@@ -101,7 +158,7 @@ const STYLES = `
     border-radius: 6px;
     transition: color 0.15s ease, background 0.15s ease;
   }
-  .password-toggle:hover { color: var(--amber-deep); background: rgba(232,163,61,0.1); }
+  .password-toggle:hover { color: var(--amber-deep); background: rgba(13,148,136,0.1); }
   .password-toggle svg { display: block; }
   .link-btn {
     background: none;
@@ -132,8 +189,8 @@ const STYLES = `
   }
   .logout-btn {
     background: transparent;
-    border: 1px solid rgba(247,244,236,0.25);
-    color: rgba(247,244,236,0.75);
+    border: 1px solid rgba(241,246,245,0.25);
+    color: rgba(241,246,245,0.75);
     padding: 6px 14px;
     border-radius: 999px;
     font-size: 12px;
@@ -144,7 +201,7 @@ const STYLES = `
     display: flex;
     align-items: center;
     gap: 10px;
-    color: rgba(247,244,236,0.85);
+    color: rgba(241,246,245,0.85);
     font-size: 13px;
   }
   .topbar {
@@ -176,14 +233,14 @@ const STYLES = `
   .portal-switch {
     display: flex;
     gap: 2px;
-    background: rgba(247,244,236,0.08);
+    background: rgba(241,246,245,0.08);
     border-radius: 999px;
     padding: 3px;
   }
   .portal-btn {
     background: transparent;
     border: none;
-    color: rgba(247,244,236,0.6);
+    color: rgba(241,246,245,0.6);
     padding: 8px 18px;
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
@@ -197,8 +254,8 @@ const STYLES = `
   .tabs { display: flex; gap: 4px; }
   .tab {
     background: transparent;
-    border: 1px solid rgba(247,244,236,0.25);
-    color: rgba(247,244,236,0.75);
+    border: 1px solid rgba(241,246,245,0.25);
+    color: rgba(241,246,245,0.75);
     padding: 8px 16px;
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
@@ -223,7 +280,7 @@ const STYLES = `
     margin-left: 6px;
     padding: 0 4px;
   }
-  .main { flex: 1; padding: 32px; max-width: 980px; margin: 0 auto; width: 100%; }
+  .main { flex: 1; padding: 32px; max-width: 980px; margin: 0 auto; width: 100%; animation: fadeInUp 0.28s ease; }
   .panel-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; margin: 0 0 4px; }
   .panel-sub { color: var(--text-soft); font-size: 14px; margin: 0 0 24px; }
   .card {
@@ -356,6 +413,48 @@ const STYLES = `
   .shop-card-cta { font-size: 13px; font-weight: 600; color: var(--amber-deep); margin-top: 2px; }
   .product-card.out-of-stock { opacity: 0.6; }
   .product-card.out-of-stock .product-stock { color: var(--danger); }
+  .notify-btn {
+    margin-top: 10px;
+    width: 100%;
+    background: var(--paper-raised);
+    border: 1px solid var(--amber-deep);
+    color: var(--amber-deep);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .notify-btn:hover:not(:disabled) { background: rgba(13,148,136,0.08); }
+  .notify-btn:disabled { border-color: var(--success); color: var(--success); cursor: default; }
+  .restock-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(13,148,136,0.09);
+    border: 1px solid rgba(13,148,136,0.35);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .restock-bell { font-size: 18px; }
+  .restock-dismiss { background: none; border: none; color: var(--text-soft); font-size: 15px; cursor: pointer; padding: 2px 6px; }
+  .restock-dismiss:hover { color: var(--ink); }
+  .wait-badge {
+    display: inline-block;
+    background: rgba(13,148,136,0.12);
+    color: var(--amber-deep);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 999px;
+    margin-left: 8px;
+    white-space: nowrap;
+  }
   .inline-rfq-card { border-color: var(--amber); border-width: 2px; margin-top: 14px; }
   .trust-badge {
     background: var(--paper-raised);
@@ -383,7 +482,7 @@ const STYLES = `
     transition: all 0.15s ease;
   }
   .product-card:hover { border-color: var(--amber); transform: translateY(-1px); }
-  .product-card.selected { border-color: var(--amber); border-width: 2px; background: rgba(232,163,61,0.05); }
+  .product-card.selected { border-color: var(--amber); border-width: 2px; background: rgba(13,148,136,0.05); }
   .product-name { font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
   .product-sku { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-soft); margin-bottom: 12px; }
   .product-price { font-size: 20px; font-weight: 600; color: var(--ink); }
@@ -401,7 +500,7 @@ const STYLES = `
     color: var(--danger);
     margin-left: 6px;
   }
-  .lead-flag.new { background: rgba(232,163,61,0.2); color: var(--amber-deep); }
+  .lead-flag.new { background: rgba(13,148,136,0.2); color: var(--amber-deep); }
   .last-activity { font-size: 10px; color: var(--text-soft); margin-top: 4px; }
   .new-order-badge {
     background: var(--amber);
@@ -424,7 +523,7 @@ const STYLES = `
   }
   .payment-badge.paid { background: rgba(47,111,79,0.12); color: var(--success); }
   .payment-badge.unpaid { background: rgba(178,58,72,0.1); color: var(--danger); }
-  .payment-badge.confirmed { background: rgba(232,163,61,0.18); color: var(--amber-deep); }
+  .payment-badge.confirmed { background: rgba(13,148,136,0.18); color: var(--amber-deep); }
   .fin-hero {
     display: grid;
     grid-template-columns: 1.3fr 1fr;
@@ -444,7 +543,7 @@ const STYLES = `
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(247,244,236,0.6);
+    color: rgba(241,246,245,0.6);
     margin-bottom: 10px;
   }
   .fin-hero-value {
@@ -455,7 +554,7 @@ const STYLES = `
     color: var(--amber);
     margin-bottom: 12px;
   }
-  .fin-hero-sub { font-size: 13px; color: rgba(247,244,236,0.8); }
+  .fin-hero-sub { font-size: 13px; color: rgba(241,246,245,0.8); }
   .fin-hero-gauge {
     background: var(--paper-raised);
     padding: 28px 32px;
@@ -507,6 +606,42 @@ const STYLES = `
     transition: width 0.4s ease;
   }
   .collection-caption { font-size: 12px; color: var(--text-soft); margin: 8px 0 0; }
+  /* --- Deal Intelligence --- */
+  .di-hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(20,33,61,0.06);
+  }
+  .di-hero-main { background: var(--ink); color: var(--paper); padding: 28px 32px; display: flex; align-items: center; gap: 26px; }
+  .di-donut { flex-shrink: 0; }
+  .di-hero-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(241,246,245,0.6); margin-bottom: 8px; }
+  .di-hero-value { font-family: 'Fraunces', serif; font-size: 40px; font-weight: 600; line-height: 1; color: var(--amber); margin-bottom: 10px; }
+  .di-hero-sub { font-size: 13px; color: rgba(241,246,245,0.8); line-height: 1.5; }
+  .di-hero-gauge { background: var(--paper-raised); padding: 26px 30px; display: flex; flex-direction: column; justify-content: center; }
+  .di-gauge-value { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 700; color: var(--success); }
+  .di-bar-track { background: rgba(20,33,61,0.08); border-radius: 999px; height: 12px; overflow: hidden; margin: 10px 0 6px; position: relative; }
+  .di-bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
+  .di-funnel-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .di-funnel-label { width: 110px; font-size: 13px; color: var(--text); font-weight: 500; flex-shrink: 0; }
+  .di-funnel-bar { flex: 1; background: rgba(20,33,61,0.06); border-radius: 6px; height: 26px; overflow: hidden; }
+  .di-funnel-fill { height: 100%; display: flex; align-items: center; padding-left: 10px; color: var(--paper); font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; border-radius: 6px; min-width: 30px; transition: width 0.5s ease; }
+  .di-insight {
+    background: rgba(13,148,136,0.08);
+    border: 1px solid rgba(13,148,136,0.35);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.55;
+    margin-top: 4px;
+  }
+  .di-insight strong { color: var(--amber-deep); }
+  @media (max-width: 640px) { .di-hero { grid-template-columns: 1fr; } .di-hero-main { flex-direction: column; text-align: center; } }
   .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .data-table th {
     text-align: left;
@@ -565,7 +700,7 @@ const STYLES = `
     white-space: nowrap;
     transition: all 0.15s ease;
   }
-  .card-btn:hover { border-color: var(--amber-deep); color: var(--amber-deep); background: rgba(232,163,61,0.08); }
+  .card-btn:hover { border-color: var(--amber-deep); color: var(--amber-deep); background: rgba(13,148,136,0.08); }
   .tabs-row {
     display: flex;
     align-items: center;
@@ -586,7 +721,7 @@ const STYLES = `
   .conv-item { padding: 14px 16px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.15s ease; }
   .conv-item:last-child { border-bottom: none; }
   .conv-item:hover { background: var(--paper); }
-  .conv-item.active { background: rgba(232,163,61,0.1); box-shadow: inset 3px 0 0 var(--amber); }
+  .conv-item.active { background: rgba(13,148,136,0.1); box-shadow: inset 3px 0 0 var(--amber); }
   .conv-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
   .conv-time { font-size: 10px; font-weight: 400; color: var(--text-soft); white-space: nowrap; }
   .conv-product { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--text-soft); margin-top: 2px; }
@@ -731,7 +866,7 @@ const STYLES = `
     margin-bottom: 4px;
   }
   .action-badge.accept { background: rgba(47,111,79,0.12); color: var(--success); }
-  .action-badge.counter { background: rgba(232,163,61,0.18); color: var(--amber-deep); }
+  .action-badge.counter { background: rgba(13,148,136,0.18); color: var(--amber-deep); }
   .action-badge.escalate { background: rgba(178,58,72,0.12); color: var(--danger); }
   .action-badge.confirm_pending { background: rgba(27,31,42,0.08); color: var(--ink); }
   .chat-input-row { display: flex; gap: 10px; }
@@ -739,7 +874,7 @@ const STYLES = `
   .thinking { color: var(--text-soft); font-size: 13px; font-style: italic; padding: 8px 0; }
   .suggest-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .suggest-chip {
-    background: rgba(232,163,61,0.08);
+    background: rgba(13,148,136,0.08);
     border: 1px dashed var(--amber-deep);
     color: var(--amber-deep);
     font-family: 'Inter', sans-serif;
@@ -750,7 +885,7 @@ const STYLES = `
     cursor: pointer;
     transition: all 0.15s ease;
   }
-  .suggest-chip:hover { background: rgba(232,163,61,0.18); }
+  .suggest-chip:hover { background: rgba(13,148,136,0.18); }
   .neg-savings { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--success); }
   .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   .pcol { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-height: 200px; }
@@ -865,7 +1000,7 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
     padding: 16px 40px;
-    background: rgba(247,244,236,0.88);
+    background: rgba(241,246,245,0.88);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
@@ -943,7 +1078,7 @@ const STYLES = `
     box-shadow: 0 16px 36px rgba(20,33,61,0.3);
     transform: rotate(-2deg);
   }
-  .hero-quote-float .quote-line { color: rgba(247,244,236,0.7); gap: 18px; }
+  .hero-quote-float .quote-line { color: rgba(241,246,245,0.7); gap: 18px; }
   .hero-quote-float .total { color: var(--amber); font-size: 18px; font-weight: 600; margin-top: 6px; }
   .land-section { max-width: 1100px; margin: 0 auto; padding: 24px 40px 0; width: 100%; }
   .land-kicker {
@@ -981,7 +1116,7 @@ const STYLES = `
     display: grid;
     place-items: center;
     font-size: 24px;
-    background: rgba(232,163,61,0.16);
+    background: rgba(13,148,136,0.16);
     border-radius: 12px;
     margin-bottom: 16px;
   }
@@ -1001,7 +1136,7 @@ const STYLES = `
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(600px 300px at 85% -20%, rgba(232,163,61,0.25), transparent 65%);
+    background: radial-gradient(600px 300px at 85% -20%, rgba(13,148,136,0.25), transparent 65%);
     pointer-events: none;
   }
   .cta-band h2 {
@@ -1012,7 +1147,7 @@ const STYLES = `
     color: var(--paper);
     margin: 0 0 12px;
   }
-  .cta-band p { position: relative; color: rgba(247,244,236,0.75); font-size: 15px; margin: 0 auto 28px; max-width: 480px; }
+  .cta-band p { position: relative; color: rgba(241,246,245,0.75); font-size: 15px; margin: 0 auto 28px; max-width: 480px; }
   .cta-band .btn { position: relative; }
   .landing-footer {
     border-top: 1px solid var(--line);
@@ -1057,7 +1192,7 @@ function PasswordField({ label, value, onChange, placeholder, autoComplete, requ
   const [visible, setVisible] = useState(false);
   return (
     <>
-      <label>{label}</label>
+      <label>{label}{required && <span className="required-mark"> *</span>}</label>
       <div className="password-field">
         <input
           type={visible ? "text" : "password"}
@@ -1066,7 +1201,7 @@ function PasswordField({ label, value, onChange, placeholder, autoComplete, requ
           placeholder={placeholder}
           autoComplete={autoComplete}
           required={required}
-          minLength={6}
+          minLength={8}
         />
         <button
           type="button"
@@ -1104,6 +1239,8 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
   const [name, setName] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [verifyState, setVerifyState] = useState(null); // { userId, target, dest, demoCode }
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1114,6 +1251,7 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
     // Sign up by mistake and then finding it pre-filled on Log in.
     setPassword("");
     setNewPassword("");
+    setOtp("");
     setError(null);
     setInfo(null);
   }
@@ -1145,6 +1283,18 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
   async function submitSignup(e) {
     e.preventDefault();
     setError(null);
+    if (!/^\d{10}$/.test(mobile.trim())) {
+      setError("Mobile number must be exactly 10 digits.");
+      return;
+    }
+    if (email.trim() && !/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email.trim())) {
+      setError("Email must be a Gmail address ending in @gmail.com.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/signup", {
@@ -1154,11 +1304,53 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
+      // New accounts must verify their email/mobile before the session starts.
+      setVerifyState({ userId: data.user_id, target: data.target, dest: data.destination_masked, demoCode: data.demo_code, delivered: data.delivered });
+      setOtp("");
+      setError(null);
+      setMode("verify");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitVerify(e) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: verifyState.userId, code: otp.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Verification failed");
       onAuthed(data.user);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function resendCode() {
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await fetch("/api/auth/resend-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: verifyState.userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not resend code");
+      setVerifyState((s) => ({ ...s, dest: data.destination_masked, demoCode: data.demo_code, delivered: data.delivered }));
+      setInfo(data.delivered ? "A new code was sent to your email." : "A new code was generated.");
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -1219,6 +1411,7 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
         <div className="auth-sub">
           {mode === "login" && "Log in to continue"}
           {mode === "signup" && "Create your account"}
+          {mode === "verify" && "Verify your account"}
           {mode === "forgot" && "Reset your password"}
           {mode === "reset" && "Set a new password"}
         </div>
@@ -1241,7 +1434,7 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
             <input type="text" name="fakeusernameremembered" style={DECOY_STYLE} tabIndex={-1} autoComplete="off" />
             <input type="password" name="fakepasswordremembered" style={DECOY_STYLE} tabIndex={-1} autoComplete="off" />
 
-            <label>Username, Email, or Mobile</label>
+            <label>Username, Email, or Mobile <span className="required-mark">*</span></label>
             <input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
@@ -1275,23 +1468,45 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
             <input type="text" name="fakeusernameremembered" style={DECOY_STYLE} tabIndex={-1} autoComplete="off" />
             <input type="password" name="fakepasswordremembered" style={DECOY_STYLE} tabIndex={-1} autoComplete="off" />
 
-            <label>{role === "seller" ? "Company / seller name" : "Your company / name"}</label>
+            <label>{role === "seller" ? "Company / seller name" : "Your company / name"} <span className="required-mark">*</span></label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Meridian Retail Co." autoComplete="off" required />
 
-            <label>Username</label>
+            <label>Username <span className="required-mark">*</span></label>
             <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. meridian_retail" autoComplete="off" required />
 
-            <label>Email <span style={{ color: "var(--text-soft)", fontWeight: 400 }}>(optional)</span></label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="off" />
+            <div style={{ fontSize: "12px", color: "var(--text-soft)", margin: "0 0 10px" }}>
+              We'll send a verification code to confirm your account.
+            </div>
 
-            <label>Mobile <span style={{ color: "var(--text-soft)", fontWeight: 400 }}>(optional)</span></label>
-            <input type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="e.g. 9876543210" autoComplete="off" />
+            <label>Mobile <span className="required-mark">*</span></label>
+            <input
+              type="tel"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="10-digit mobile number"
+              inputMode="numeric"
+              maxLength={10}
+              pattern="\d{10}"
+              autoComplete="off"
+              required
+            />
+
+            <label>Email <span style={{ color: "var(--text-soft)", fontWeight: 400 }}>(optional — Gmail only)</span></label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@gmail.com"
+              pattern="[a-zA-Z0-9._%+\-]+@gmail\.com"
+              title="Enter a Gmail address ending in @gmail.com"
+              autoComplete="off"
+            />
 
             <PasswordField
               label="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
               autoComplete="off"
               required
             />
@@ -1303,9 +1518,46 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
           </form>
         )}
 
+        {mode === "verify" && verifyState && (
+          <form onSubmit={submitVerify} autoComplete="off">
+            <p style={{ fontSize: "13px", color: "var(--text-soft)", margin: "0 0 16px", lineHeight: 1.5 }}>
+              We sent a 6-digit code to your {verifyState.target === "email" ? "email" : "mobile"}{" "}
+              <strong style={{ color: "var(--text)" }}>{verifyState.dest}</strong>.{" "}
+              {verifyState.delivered ? "Check your inbox (and spam folder), then enter it below." : "Enter it below to finish creating your account."}
+            </p>
+
+            {verifyState.demoCode && (
+              <div className="info-box" style={{ marginBottom: "16px" }}>
+                Demo mode — your code is <strong style={{ fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.1em" }}>{verifyState.demoCode}</strong>.
+                A live deployment would send this by email/SMS instead of showing it here.
+              </div>
+            )}
+            {info && <div className="info-box" style={{ marginBottom: "16px" }}>{info}</div>}
+
+            <label>Verification code</label>
+            <input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6-digit code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "18px", letterSpacing: "0.2em", textAlign: "center" }}
+              required
+            />
+
+            {error && <div className="error-box">{error}</div>}
+            <button className="btn amber" style={{ width: "100%" }} disabled={loading || otp.length < 6}>
+              {loading ? "Verifying..." : "Verify & Continue"}
+            </button>
+            <div style={{ textAlign: "center", marginTop: "14px" }}>
+              <button type="button" className="link-btn" onClick={resendCode}>Resend code</button>
+            </div>
+          </form>
+        )}
+
         {mode === "forgot" && (
           <form onSubmit={submitForgot}>
-            <label>Username, Email, or Mobile</label>
+            <label>Username, Email, or Mobile <span className="required-mark">*</span></label>
             <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Enter your account identifier" required />
             {error && <div className="error-box">{error}</div>}
             <button className="btn amber" style={{ width: "100%" }} disabled={loading}>
@@ -1317,13 +1569,13 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
         {mode === "reset" && (
           <form onSubmit={submitReset}>
             {info && <div className="info-box">{info}</div>}
-            <label>Reset Token</label>
+            <label>Reset Token <span className="required-mark">*</span></label>
             <input value={resetToken} onChange={(e) => setResetToken(e.target.value)} placeholder="Reset token" required />
             <PasswordField
               label="New Password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
               autoComplete="new-password"
               required
             />
@@ -1340,6 +1592,9 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
           )}
           {(mode === "signup" || mode === "forgot" || mode === "reset") && (
             <>Already have an account? <button onClick={() => switchMode("login")}>Log in</button></>
+          )}
+          {mode === "verify" && (
+            <>Entered the wrong details? <button onClick={() => switchMode("signup")}>Start over</button></>
           )}
         </div>
       </div>
@@ -1454,6 +1709,7 @@ function Topbar({ user, tab, setTab, onLogout, newOrderCount, unreadMessages }) 
     seller: [
       { id: "setup", label: "Seller Setup" },
       { id: "pipeline", label: "Pipeline" },
+      { id: "insights", label: "AI Insights" },
       { id: "finance", label: "Finance" },
       { id: "audit", label: "Audit Log" },
     ],
@@ -1495,7 +1751,7 @@ function Topbar({ user, tab, setTab, onLogout, newOrderCount, unreadMessages }) 
   );
 }
 
-function SellerSetup({ catalog, rules, shopDescription, onSaved }) {
+function SellerSetup({ catalog, rules, shopDescription, waitCounts, onSaved }) {
   const [localCatalog, setLocalCatalog] = useState(catalog);
   const [localRules, setLocalRules] = useState(rules);
   const [localDescription, setLocalDescription] = useState(shopDescription || "");
@@ -1546,6 +1802,7 @@ function SellerSetup({ catalog, rules, shopDescription, onSaved }) {
       setNewName("");
       setNewPrice("");
       setNewStock("");
+      showToast("Product added to your catalog");
       onSaved?.();
     } catch (err) {
       setAddError(err.message);
@@ -1575,6 +1832,7 @@ function SellerSetup({ catalog, rules, shopDescription, onSaved }) {
       });
       if (!res.ok) throw new Error("Failed to save");
       setSaved(true);
+      showToast("Changes saved — new rules apply to the next negotiation");
       onSaved?.();
     } catch (err) {
       setError(err.message);
@@ -1615,6 +1873,11 @@ function SellerSetup({ catalog, rules, shopDescription, onSaved }) {
           <div key={p.id} className="edit-row">
             <div className="edit-row-label">
               {p.name} <span style={{ color: "var(--text-soft)" }}>({p.sku})</span>
+              {waitCounts && waitCounts[p.id] > 0 && (
+                <span className="wait-badge" title="Buyers waiting for this to come back in stock">
+                  🔔 {waitCounts[p.id]} waiting
+                </span>
+              )}
             </div>
             <div className="edit-row-fields">
               <div>
@@ -1749,6 +2012,8 @@ function RFQForm({ onQuoteCreated }) {
   const [productQuery, setProductQuery] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [notified, setNotified] = useState([]); // buyer's own waitlist product ids (this session)
+  const [backInStock, setBackInStock] = useState([]); // back-in-stock alerts
 
   useEffect(() => {
     fetch("/api/products")
@@ -1756,7 +2021,33 @@ function RFQForm({ onQuoteCreated }) {
       .then((data) => setProducts(data.products || []))
       .catch(() => {})
       .finally(() => setLoadingProducts(false));
+    fetch("/api/my-notifications")
+      .then((res) => res.json())
+      .then((data) => setBackInStock(data.notifications || []))
+      .catch(() => {});
   }, []);
+
+  async function notifyMe(product) {
+    setNotified((prev) => [...prev, product.id]);
+    try {
+      const res = await fetch("/api/stock-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: product.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      showToast(data.already ? "You're already on the waitlist for this" : `We'll notify you when ${product.name} is back in stock`);
+    } catch (err) {
+      setNotified((prev) => prev.filter((id) => id !== product.id));
+      showToast(err.message || "Couldn't join the waitlist", "error");
+    }
+  }
+
+  async function dismissBackInStock() {
+    setBackInStock([]);
+    await fetch("/api/my-notifications/seen", { method: "POST" }).catch(() => {});
+  }
 
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const isValid = selectedProductId && Number(quantity) > 0;
@@ -1836,6 +2127,17 @@ function RFQForm({ onQuoteCreated }) {
     </>
   );
 
+  const banner = backInStock.length > 0 ? (
+    <div className="restock-banner">
+      <span className="restock-bell">🔔</span>
+      <div style={{ flex: 1 }}>
+        <strong>Back in stock: </strong>
+        {backInStock.map((n) => n.product_name).join(", ")} — you asked to be notified.
+      </div>
+      <button className="restock-dismiss" onClick={dismissBackInStock} aria-label="Dismiss">✕</button>
+    </div>
+  ) : null;
+
   if (loadingProducts && products.length === 0) {
     return <div className="main">{header}<div className="card"><p className="empty" style={{ padding: "8px 0" }}>Loading the marketplace...</p></div></div>;
   }
@@ -1856,6 +2158,7 @@ function RFQForm({ onQuoteCreated }) {
 
     return (
       <div className="main">
+        {banner}
         <button className="back-link" onClick={backToShops}>← All shops</button>
 
         <div className="shop-header">
@@ -1899,12 +2202,22 @@ function RFQForm({ onQuoteCreated }) {
               <div
                 key={p.id}
                 className={"product-card" + (selectedProductId === p.id ? " selected" : "") + (p.stock === 0 ? " out-of-stock" : "")}
-                onClick={() => selectProduct(p.id)}
+                onClick={() => (p.stock > 0 ? selectProduct(p.id) : null)}
+                style={p.stock === 0 ? { cursor: "default" } : undefined}
               >
                 <div className="product-name">{p.name}</div>
                 <div className="product-sku">{p.sku}</div>
                 <div className="product-price">₹{p.base_price}<span>/unit</span></div>
                 <div className="product-stock">{p.stock > 0 ? `${p.stock.toLocaleString()} in stock` : "Out of stock"}</div>
+                {p.stock === 0 && (
+                  <button
+                    className="notify-btn"
+                    disabled={notified.includes(p.id)}
+                    onClick={(e) => { e.stopPropagation(); notifyMe(p); }}
+                  >
+                    {notified.includes(p.id) ? "✓ On the waitlist" : "🔔 Notify me when back"}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1954,6 +2267,7 @@ function RFQForm({ onQuoteCreated }) {
   return (
     <div className="main">
       {header}
+      {banner}
 
       <div className="marketplace-toolbar">
         <div className="search-field">
@@ -2493,26 +2807,30 @@ function Pipeline({ deals, refresh, readOnly, onReorder, onMessage }) {
   }
 
   async function markInvoiced(id) {
-    await fetch(`/api/deals/${id}/status`, {
+    const res = await fetch(`/api/deals/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "invoiced" }),
     });
+    if (res.ok) showToast("Invoice generated"); else showToast("Couldn't generate invoice", "error");
     refresh();
   }
 
   async function acknowledge(id) {
-    await fetch(`/api/deals/${id}/acknowledge`, { method: "POST" });
+    const res = await fetch(`/api/deals/${id}/acknowledge`, { method: "POST" });
+    if (res.ok) showToast("Order acknowledged"); else showToast("Couldn't acknowledge order", "error");
     refresh();
   }
 
   async function markPaid(id) {
-    await fetch(`/api/deals/${id}/mark-paid`, { method: "POST" });
+    const res = await fetch(`/api/deals/${id}/mark-paid`, { method: "POST" });
+    if (res.ok) showToast("Marked as paid"); else showToast("Couldn't mark as paid", "error");
     refresh();
   }
 
   async function sendReminder(id) {
-    await fetch(`/api/deals/${id}/send-reminder`, { method: "POST" });
+    const res = await fetch(`/api/deals/${id}/send-reminder`, { method: "POST" });
+    if (res.ok) showToast("Payment reminder sent to buyer"); else showToast("Couldn't send reminder", "error");
     refresh();
   }
 
@@ -2662,6 +2980,141 @@ function Pipeline({ deals, refresh, readOnly, onReorder, onMessage }) {
 
       {invoiceDealId && <InvoicePreview dealId={invoiceDealId} onClose={() => setInvoiceDealId(null)} />}
       {negotiationDealId && <NegotiationHistoryModal dealId={negotiationDealId} onClose={() => setNegotiationDealId(null)} />}
+    </div>
+  );
+}
+
+function WinRateDonut({ pct }) {
+  const r = 15.9155; // circumference = 100
+  return (
+    <svg className="di-donut" width="112" height="112" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r={r} fill="none" stroke="rgba(241,246,245,0.18)" strokeWidth="3.2" />
+      <circle
+        cx="18" cy="18" r={r} fill="none" stroke="#0D9488" strokeWidth="3.2"
+        strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset="25" strokeLinecap="round"
+      />
+      <text x="18" y="18.7" textAnchor="middle" dominantBaseline="middle"
+        fontFamily="'IBM Plex Mono', monospace" fontSize="8" fontWeight="700" fill="#F1F6F5">{pct}%</text>
+      <text x="18" y="23.5" textAnchor="middle" dominantBaseline="middle"
+        fontFamily="Inter, sans-serif" fontSize="2.6" fill="rgba(241,246,245,0.6)">WIN RATE</text>
+    </svg>
+  );
+}
+
+function DealIntelligence() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/deal-intelligence")
+      .then((res) => res.json())
+      .then((data) => setStats(data.stats))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const header = (
+    <>
+      <h2 className="panel-title">AI Deal Intelligence</h2>
+      <p className="panel-sub">What your negotiation agent actually did for you — every number below is computed from real deals, not estimates.</p>
+    </>
+  );
+
+  if (loading) return <div className="main">{header}<div className="card"><p className="empty" style={{ padding: "8px 0" }}>Crunching your negotiation data...</p></div></div>;
+  if (!stats) return <div className="main">{header}<div className="error-box">Couldn't load deal intelligence.</div></div>;
+
+  if (stats.total_deals === 0) {
+    return (
+      <div className="main">{header}
+        <div className="card"><p className="empty" style={{ padding: "8px 0" }}>
+          No deals yet. Once buyers request quotes and negotiate with your agent, this dashboard fills in automatically.
+        </p></div>
+      </div>
+    );
+  }
+
+  const discountRoomUsed = stats.max_discount_pct > 0
+    ? Math.min(100, Math.round((stats.avg_discount_pct / stats.max_discount_pct) * 100))
+    : 0;
+  const maxFunnel = Math.max(1, stats.funnel.quote_sent, stats.funnel.negotiating, stats.funnel.confirmed, stats.funnel.invoiced);
+  const funnelRows = [
+    { label: "Quote sent", val: stats.funnel.quote_sent, color: "var(--text-soft)" },
+    { label: "Negotiating", val: stats.funnel.negotiating, color: "var(--amber)" },
+    { label: "Confirmed", val: stats.funnel.confirmed, color: "var(--success)" },
+    { label: "Invoiced", val: stats.funnel.invoiced, color: "var(--ink)" },
+  ];
+
+  return (
+    <div className="main">
+      {header}
+
+      <div className="di-hero">
+        <div className="di-hero-main">
+          <WinRateDonut pct={stats.win_rate} />
+          <div>
+            <div className="di-hero-label">Negotiations handled by your agent</div>
+            <div className="di-hero-value">{stats.negotiated_deals}</div>
+            <div className="di-hero-sub">
+              {stats.closed_deals} deal{stats.closed_deals === 1 ? "" : "s"} closed · ₹{stats.closed_revenue.toLocaleString("en-IN")} in closed revenue
+              {stats.avg_rounds_to_close > 0 && <> · avg {stats.avg_rounds_to_close} exchanges to close</>}
+            </div>
+          </div>
+        </div>
+        <div className="di-hero-gauge">
+          <div className="di-hero-label" style={{ color: "var(--text-soft)" }}>Margin protected by the agent</div>
+          <div className="di-gauge-value">₹{stats.margin_protected.toLocaleString("en-IN")}</div>
+          <div className="di-bar-track">
+            <div className="di-bar-fill" style={{ width: `${discountRoomUsed}%`, background: "var(--amber)" }} />
+          </div>
+          <p className="collection-caption">
+            Agent gave an avg <strong>{stats.avg_discount_pct}%</strong> discount — using {discountRoomUsed}% of the {stats.max_discount_pct}% room you allowed. The rest stayed as margin.
+          </p>
+        </div>
+      </div>
+
+      <div className="stat-grid">
+        <div className="stat-card accent-success">
+          <div className="stat-icon">🎯</div>
+          <div className="stat-label">Win Rate</div>
+          <div className="stat-value success">{stats.win_rate}%</div>
+        </div>
+        <div className="stat-card accent-amber">
+          <div className="stat-icon">🤝</div>
+          <div className="stat-label">Avg Discount Given</div>
+          <div className="stat-value">{stats.avg_discount_pct}%</div>
+        </div>
+        <div className="stat-card accent-ink">
+          <div className="stat-icon">💬</div>
+          <div className="stat-label">Avg Exchanges to Close</div>
+          <div className="stat-value">{stats.avg_rounds_to_close || "—"}</div>
+        </div>
+        <div className="stat-card accent-danger">
+          <div className="stat-icon">💸</div>
+          <div className="stat-label">Savings Passed to Buyers</div>
+          <div className="stat-value">₹{stats.total_discount_given.toLocaleString("en-IN")}</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 style={{ fontFamily: "Fraunces, serif", fontSize: "16px", margin: "0 0 16px" }}>Deal Funnel</h3>
+        {funnelRows.map((r) => (
+          <div key={r.label} className="di-funnel-row">
+            <div className="di-funnel-label">{r.label}</div>
+            <div className="di-funnel-bar">
+              <div className="di-funnel-fill" style={{ width: `${Math.max(6, (r.val / maxFunnel) * 100)}%`, background: r.color }}>
+                {r.val}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {stats.top_negotiated_product && (
+        <div className="di-insight">
+          💡 Your most-negotiated product is <strong>{stats.top_negotiated_product}</strong> ({stats.top_negotiated_count} negotiation{stats.top_negotiated_count === 1 ? "" : "s"}).
+          Buyers push hardest here — worth reviewing its price and discount tiers in Seller Setup.
+        </div>
+      )}
     </div>
   );
 }
@@ -2851,6 +3304,7 @@ function App() {
   const [tab, setTab] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [rules, setRules] = useState(null);
+  const [waitCounts, setWaitCounts] = useState({});
   const [shopDescription, setShopDescription] = useState("");
   const [activeDealId, setActiveDealId] = useState(null);
   const [deals, setDeals] = useState([]);
@@ -2872,6 +3326,7 @@ function App() {
     setCatalog(data.catalog);
     setRules(data.rules);
     setShopDescription(data.shop_description || "");
+    setWaitCounts(data.wait_counts || {});
   }
 
   async function loadDeals() {
@@ -2963,9 +3418,10 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reorder");
+      showToast("New quote created — negotiate or confirm it");
       handleQuoteCreated(data.deal_id);
     } catch (err) {
-      console.error("Reorder failed:", err.message);
+      showToast(err.message || "Reorder failed", "error");
     }
   }
 
@@ -2994,8 +3450,9 @@ function App() {
   return (
     <div className="app">
       <style>{STYLES}</style>
+      <ToastHost />
       <Topbar user={user} tab={tab} setTab={setTab} onLogout={handleLogout} newOrderCount={newOrderCount} unreadMessages={unreadMessages} />
-      {tab === "setup" && <SellerSetup catalog={catalog} rules={rules} shopDescription={shopDescription} onSaved={loadSetup} />}
+      {tab === "setup" && <SellerSetup catalog={catalog} rules={rules} shopDescription={shopDescription} waitCounts={waitCounts} onSaved={loadSetup} />}
       {tab === "rfq" && <RFQForm onQuoteCreated={handleQuoteCreated} />}
       {tab === "negotiate" && (
         <NegotiationChat deals={deals} dealId={activeDealId} onSelectDeal={setActiveDealId} refreshDeals={loadDeals} />
@@ -3003,6 +3460,7 @@ function App() {
       {tab === "pipeline" && <Pipeline deals={deals} refresh={loadDeals} onMessage={openMessages} />}
       {tab === "orders" && <Pipeline deals={deals} refresh={loadDeals} readOnly onReorder={handleReorder} onMessage={openMessages} />}
       {tab === "messages" && <MessagesView key={messagesDealId || "inbox"} user={user} initialDealId={messagesDealId} />}
+      {tab === "insights" && <DealIntelligence />}
       {tab === "finance" && <FinanceTab />}
       {tab === "audit" && <AuditLogTab />}
     </div>

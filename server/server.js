@@ -5,7 +5,7 @@ const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
 const path = require("path");
 const db = require("./db");
-const { seedDemoData } = require("./seed");
+const { seedDemoData, seedDemoDeals } = require("./seed");
 
 const { createQuote } = require("./routes/quote");
 const { negotiate } = require("./routes/negotiate");
@@ -26,10 +26,16 @@ const {
   sendReminder,
   getLedger,
   getRevenue,
+  getDealIntelligence,
   getAuditLog,
+  subscribeStock,
+  getMyNotifications,
+  dismissMyNotifications,
 } = require("./routes/deals");
 const {
   signup,
+  verifyOtp,
+  resendOtp,
   login,
   logout,
   me,
@@ -62,6 +68,8 @@ app.use(
 
 // Auth routes
 app.post("/api/auth/signup", signup);
+app.post("/api/auth/verify-otp", verifyOtp);
+app.post("/api/auth/resend-otp", resendOtp);
 app.post("/api/auth/login", login);
 app.post("/api/auth/logout", logout);
 app.get("/api/auth/me", me);
@@ -81,10 +89,14 @@ app.post("/api/deals/:id/mark-paid", requireRole("seller"), markPaid);
 app.post("/api/deals/:id/send-reminder", requireRole("seller"), sendReminder);
 app.get("/api/ledger", requireRole("seller"), getLedger);
 app.get("/api/revenue", requireRole("seller"), getRevenue);
+app.get("/api/deal-intelligence", requireRole("seller"), getDealIntelligence);
 app.get("/api/audit-log", requireRole("seller"), getAuditLog);
 app.get("/api/deals/:id/messages", requireAuth, getDealMessages);
 app.post("/api/deals/:id/messages", requireAuth, postDealMessage);
 app.get("/api/conversations", requireAuth, getConversations);
+app.post("/api/stock-notify", requireRole("buyer"), subscribeStock);
+app.get("/api/my-notifications", requireRole("buyer"), getMyNotifications);
+app.post("/api/my-notifications/seen", requireRole("buyer"), dismissMyNotifications);
 
 // Seller's own catalog
 app.get("/api/setup", requireRole("seller"), getCatalogAndRules);
@@ -121,14 +133,18 @@ async function start() {
     process.exit(1);
   }
 
-  try {
-    await seedDemoData();
-  } catch (err) {
-    console.warn("Warning: demo data seeding failed:", err.message);
-  }
-
   app.listen(PORT, () => {
     console.log(`NegotiAI running on http://localhost:${PORT}`);
+
+    // Seed demo data in the BACKGROUND after the port is already bound —
+    // it's a long series of writes to a remote DB, and blocking startup on
+    // it would delay the server binding its port (and can fail a platform
+    // health check on the first deploy). It's idempotent, so it's a one-time
+    // cost on a fresh database and a fast no-op on every boot after.
+    seedDemoData()
+      .then(seedDemoDeals)
+      .then(() => console.log("Demo data ready."))
+      .catch((err) => console.warn("Warning: demo data seeding failed:", err.message));
 
     const primary = process.env.PRIMARY_PROVIDER || "xai";
     const backups = (process.env.BACKUP_PROVIDERS || "")
@@ -155,5 +171,10 @@ async function start() {
     }
   });
 }
+
+// Surface unhandled background-seed errors instead of crashing the process.
+process.on("unhandledRejection", (err) => {
+  console.warn("Unhandled rejection:", err && err.message ? err.message : err);
+});
 
 start();

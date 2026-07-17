@@ -85,6 +85,20 @@ CREATE TABLE IF NOT EXISTS reset_tokens (
   expires_at TIMESTAMPTZ NOT NULL
 );
 
+-- One-time verification codes (OTP) for confirming a new account's email or
+-- mobile at signup. In this demo the code is shown on screen instead of being
+-- sent by email/SMS (same approach as reset_tokens) — a real deployment would
+-- deliver it and never return it in the API response.
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  target TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Direct human-to-human messages between buyer and seller on a deal —
 -- separate from the AI negotiation history. Used for things the AI
 -- shouldn't handle: "we're out of stock", "we don't want to sell to you",
@@ -95,6 +109,23 @@ CREATE TABLE IF NOT EXISTS deal_messages (
   sender_role TEXT NOT NULL,
   message TEXT NOT NULL,
   at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Out-of-stock waitlist / lead capture. When a buyer taps "notify me" on an
+-- out-of-stock product, a 'waiting' row is created. When the seller restocks,
+-- the rows flip to 'notified' and surface to the buyer as a back-in-stock
+-- banner. The seller sees the waiting count as an unmet-demand signal.
+CREATE TABLE IF NOT EXISTS stock_notifications (
+  id UUID PRIMARY KEY,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  seller_id UUID NOT NULL,
+  buyer_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  buyer_name TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'waiting',
+  seen BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  notified_at TIMESTAMPTZ
 );
 
 -- Structured compliance audit trail — deliberately separate from the AI
@@ -124,6 +155,8 @@ ALTER TABLE deals ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN NOT NULL DEFAU
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'unpaid';
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_description TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_via TEXT;
 `;
 
 async function initSchema() {

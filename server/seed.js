@@ -90,7 +90,117 @@ async function seedDemoData() {
        WHERE username_lower = $2 AND (shop_description IS NULL OR shop_description = '')`,
       [seller.description, seller.username]
     );
+    // Demo accounts are pre-verified so they skip the OTP step.
+    await db.query("UPDATE users SET verified = true, verified_via = 'demo' WHERE username_lower = $1", [seller.username]);
   }
 }
 
-module.exports = { seedDemoData };
+// Buyers used only to populate demo negotiation history, so the seller
+// dashboards (AI Insights, Finance, Pipeline, Audit) look alive in a demo.
+const DEMO_BUYERS = [
+  { username: "horizon_traders_demo", name: "Horizon Traders" },
+  { username: "meridian_retail_demo", name: "Meridian Retail Co." },
+  { username: "cityline_wholesale_demo", name: "Cityline Wholesale" },
+];
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// Builds a realistic quote snapshot + a short negotiation transcript for a
+// product at a given discount, so the analytics have real history to chew on.
+function buildDeal(product, quantity, discountPct) {
+  const unit = round2(product.base_price * (1 - discountPct / 100));
+  const total = Math.round(unit * quantity);
+  const quote = {
+    product_name: product.name,
+    base_price: product.base_price,
+    unit_price: unit,
+    discount_percent: discountPct,
+    quantity,
+    total,
+  };
+  const history = [];
+  if (discountPct > 0) {
+    history.push({ role: "buyer", message: `Can you do better than ₹${product.base_price}/unit if I take ${quantity}?`, at: new Date().toISOString() });
+    history.push({
+      role: "agent", action: "counter", provider: "demo",
+      message: `At ${quantity} units I can offer ₹${unit}/unit — that's ${discountPct}% off, our best at this volume.`,
+      reasoning: `Buyer volume qualifies for a bulk tier; ${discountPct}% stays within the seller's max-discount rule.`,
+      quote, at: new Date().toISOString(),
+    });
+    history.push({ role: "buyer", message: "Deal, let's go ahead.", at: new Date().toISOString() });
+  } else {
+    history.push({ role: "buyer", message: "Is this your best price?", at: new Date().toISOString() });
+    history.push({
+      role: "agent", action: "accept", provider: "demo",
+      message: `This is already sharp for ${quantity} units — I'd recommend locking it in.`,
+      reasoning: "Requested terms are within seller rules; holding at list price protects margin.",
+      quote, at: new Date().toISOString(),
+    });
+    history.push({ role: "buyer", message: "Okay, confirmed.", at: new Date().toISOString() });
+  }
+  return { quote, history };
+}
+
+// Per-seller demo deal specs: [productIndex, quantity, discount%, finalStatus, paid?]
+const DEMO_DEAL_PLAN = [
+  [0, 300, 6, "invoiced", true],
+  [1, 500, 9, "invoiced", true],
+  [2, 150, 3, "confirmed", false],
+  [3, 800, 11, "invoiced", false],
+  [1, 200, 0, "confirmed", false],
+  [0, 1000, 10, "negotiating", false],
+  [2, 400, 6, "invoiced", true],
+];
+
+async function seedDemoDeals() {
+  // Ensure demo buyers exist.
+  const buyers = [];
+  for (const b of DEMO_BUYERS) {
+    let u = await store.findUserByUsername(b.username);
+    if (!u) u = await store.createUser({ username: b.username, password: DEMO_PASSWORD, role: "buyer", name: b.name });
+    await db.query("UPDATE users SET verified = true, verified_via = 'demo' WHERE id = $1", [u.id]);
+    buyers.push(u);
+  }
+
+  for (const seller of DEMO_SELLERS) {
+    const sellerUser = await store.findUserByUsername(seller.username);
+    if (!sellerUser) continue;
+    const products = await store.getProductsForSeller(sellerUser.id);
+    if (products.length < 4) continue;
+
+    // Idempotent: only seed if this seller has no demo-buyer deals yet.
+    const existing = await db.query(
+      "SELECT COUNT(*) AS c FROM deals WHERE seller_id = $1 AND buyer_user_id = ANY($2)",
+      [sellerUser.id, buyers.map((b) => b.id)]
+    );
+    if (Number(existing.rows[0].c) > 0) continue;
+
+    for (let i = 0; i < DEMO_DEAL_PLAN.length; i++) {
+      const [pIdx, qty, disc, finalStatus, paid] = DEMO_DEAL_PLAN[i];
+      const product = products[pIdx % products.length];
+      const buyer = buyers[i % buyers.length];
+      const { quote, history } = buildDeal(product, qty, disc);
+
+      const deal = await store.createDeal({
+        product_id: product.id, sku: product.sku, quantity: qty,
+        buyer_name: buyer.name, buyer_user_id: buyer.id, seller_id: sellerUser.id,
+        initialQuote: quote,
+      });
+      for (const h of history) await store.appendHistory(deal.id, h);
+      await store.updateDeal(deal.id, { seller_acknowledged: true });
+
+      if (finalStatus === "negotiating") {
+        await store.updateDeal(deal.id, { status: "negotiating" });
+      } else {
+        await store.confirmDealAndDeductStock(deal.id);
+        if (finalStatus === "invoiced") {
+          await store.updateDeal(deal.id, { status: "invoiced", invoice_number: store.nextInvoiceNumber(), invoiced_at: new Date().toISOString() });
+          if (paid) await store.markDealPaid(deal.id);
+        }
+      }
+    }
+    console.log(`Seeded demo deal history for ${seller.name}`);
+  }
+}
+
+module.exports = { seedDemoData, seedDemoDeals };

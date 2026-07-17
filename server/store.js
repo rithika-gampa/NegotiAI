@@ -82,6 +82,8 @@ function rowToUser(row) {
     role: row.role,
     name: row.name,
     shop_description: row.shop_description || null,
+    verified: row.verified || false,
+    verified_via: row.verified_via || null,
     created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   };
 }
@@ -142,6 +144,39 @@ async function consumePasswordResetToken(token) {
   return row.user_id;
 }
 
+// --- OTP verification (email/mobile at signup) ---
+const OTP_TTL_MS = 10 * 60 * 1000;
+
+async function createOtpCode(userId, target, destination) {
+  // Only one active code per user — clear any previous ones first.
+  await db.query("DELETE FROM otp_codes WHERE user_id = $1", [userId]);
+  const id = crypto.randomUUID();
+  const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  await db.query(
+    "INSERT INTO otp_codes (id, user_id, code, target, destination, expires_at) VALUES ($1, $2, $3, $4, $5, $6)",
+    [id, userId, code, target, destination, expiresAt]
+  );
+  return code;
+}
+
+// Returns "ok" | "invalid" | "expired". On success, marks the user verified
+// and clears their codes.
+async function verifyOtpCode(userId, code) {
+  const res = await db.query("SELECT * FROM otp_codes WHERE user_id = $1", [userId]);
+  const row = res.rows[0];
+  if (!row || String(row.code) !== String(code).trim()) return "invalid";
+  const expiresAt = row.expires_at instanceof Date ? row.expires_at.getTime() : new Date(row.expires_at).getTime();
+  if (Date.now() > expiresAt) return "expired";
+  await db.query("UPDATE users SET verified = true, verified_via = $1 WHERE id = $2", [row.target, userId]);
+  await db.query("DELETE FROM otp_codes WHERE user_id = $1", [userId]);
+  return "ok";
+}
+
+async function markUserVerified(userId, via) {
+  await db.query("UPDATE users SET verified = true, verified_via = $1 WHERE id = $2", [via || "manual", userId]);
+}
+
 // --- Products ---
 
 function rowToProduct(row) {
@@ -176,7 +211,71 @@ async function updateProduct(sellerId, productId, updates) {
   const name = updates.name !== undefined ? updates.name : existing.name;
 
   await db.query("UPDATE products SET base_price = $1, stock = $2, name = $3 WHERE id = $4", [base_price, stock, name, productId]);
+
+  // Restock event: if the product was out and now has stock, fulfill any
+  // waiting notifications so buyers get a back-in-stock alert.
+  if (Number(existing.stock) <= 0 && stock > 0) {
+    await fulfillStockNotifications(productId);
+  }
   return rowToProduct({ ...existing, base_price, stock, name });
+}
+
+// --- Out-of-stock waitlist / lead capture ---
+
+async function addStockNotification(product, buyer) {
+  // Don't duplicate an existing 'waiting' subscription for this buyer+product.
+  const existing = await db.query(
+    "SELECT id FROM stock_notifications WHERE product_id = $1 AND buyer_user_id = $2 AND status = 'waiting'",
+    [product.id, buyer.id]
+  );
+  if (existing.rows.length) return { already: true };
+  const id = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO stock_notifications (id, product_id, seller_id, buyer_user_id, buyer_name, product_name)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, product.id, product.seller_id, buyer.id, buyer.name, product.name]
+  );
+  return { already: false };
+}
+
+// product_id -> count of buyers currently waiting (the seller's demand signal).
+async function getStockWaitCountsForSeller(sellerId) {
+  const res = await db.query(
+    "SELECT product_id, COUNT(*) AS c FROM stock_notifications WHERE seller_id = $1 AND status = 'waiting' GROUP BY product_id",
+    [sellerId]
+  );
+  const map = {};
+  for (const row of res.rows) map[row.product_id] = Number(row.c);
+  return map;
+}
+
+async function fulfillStockNotifications(productId) {
+  await db.query(
+    "UPDATE stock_notifications SET status = 'notified', notified_at = now() WHERE product_id = $1 AND status = 'waiting'",
+    [productId]
+  );
+}
+
+// Back-in-stock alerts for a buyer that they haven't dismissed yet.
+async function getBuyerBackInStock(buyerId) {
+  const res = await db.query(
+    `SELECT sn.*, p.id AS live_product_id, p.stock
+     FROM stock_notifications sn
+     JOIN products p ON p.id = sn.product_id
+     WHERE sn.buyer_user_id = $1 AND sn.status = 'notified' AND sn.seen = false
+     ORDER BY sn.notified_at DESC`,
+    [buyerId]
+  );
+  return res.rows.map((row) => ({
+    id: row.id,
+    product_id: row.product_id,
+    product_name: row.product_name,
+    in_stock: Number(row.stock) > 0,
+  }));
+}
+
+async function markBuyerNotificationsSeen(buyerId) {
+  await db.query("UPDATE stock_notifications SET seen = true WHERE buyer_user_id = $1 AND status = 'notified'", [buyerId]);
 }
 
 async function findProductById(productId) {
@@ -519,6 +618,89 @@ async function getRevenueStatsForSeller(sellerId) {
   };
 }
 
+// --- Deal Intelligence: quantifies what the AI negotiation agent actually
+// did for the seller. Every number here is derived from real deal data
+// (the quote snapshot + negotiation history stored on each deal) — nothing
+// is estimated or faked. ---
+async function getDealIntelligenceForSeller(sellerId) {
+  const res = await db.query("SELECT status, quote, history, created_at FROM deals WHERE seller_id = $1", [sellerId]);
+  const rules = await getSellerRules(sellerId);
+  const maxDiscount = Number(rules.max_discount_percent) || 0;
+
+  const deals = res.rows.map((row) => ({
+    status: row.status,
+    quote: typeof row.quote === "string" ? JSON.parse(row.quote) : row.quote,
+    history: typeof row.history === "string" ? JSON.parse(row.history) : row.history || [],
+  }));
+
+  const closed = deals.filter((d) => ["confirmed", "invoiced"].includes(d.status));
+  // A deal counts as "negotiated" if the buyer sent at least one message to
+  // the agent (i.e. they didn't just take the instant quote untouched).
+  const negotiated = deals.filter((d) => (d.history || []).some((h) => h.role === "buyer"));
+  const negotiatedClosed = closed.filter((d) => (d.history || []).some((h) => h.role === "buyer"));
+
+  // Discount + margin math over closed deals.
+  let totalListValue = 0; // what the goods would have cost at list price
+  let totalDiscountGiven = 0; // ₹ the agent conceded
+  let maxAllowedDiscountValue = 0; // ₹ the agent COULD have conceded at the ceiling
+  let discountPctSum = 0;
+  for (const d of closed) {
+    const q = d.quote || {};
+    const list = (Number(q.base_price) || 0) * (Number(q.quantity) || 0);
+    const given = Math.max(0, list - (Number(q.total) || 0));
+    totalListValue += list;
+    totalDiscountGiven += given;
+    maxAllowedDiscountValue += list * (maxDiscount / 100);
+    discountPctSum += Number(q.discount_percent) || 0;
+  }
+  // Margin the agent protected: how much discount room it was allowed to use
+  // but chose not to (because the buyer settled higher).
+  const marginProtected = Math.max(0, maxAllowedDiscountValue - totalDiscountGiven);
+  const avgDiscountPct = closed.length ? discountPctSum / closed.length : 0;
+
+  // Average exchanges to close a negotiated deal.
+  const roundsList = negotiatedClosed.map((d) => (d.history || []).filter((h) => h.role === "buyer").length);
+  const avgRounds = roundsList.length ? roundsList.reduce((a, b) => a + b, 0) / roundsList.length : 0;
+
+  // Win rate: closed deals as a share of all deals that actually entered the
+  // funnel (i.e. a quote was created — which is every deal).
+  const winRate = deals.length ? (closed.length / deals.length) * 100 : 0;
+
+  // Most-negotiated product (by number of negotiated deals).
+  const byProduct = {};
+  for (const d of negotiated) {
+    const name = (d.quote && d.quote.product_name) || "—";
+    byProduct[name] = (byProduct[name] || 0) + 1;
+  }
+  let topProduct = null, topProductCount = 0;
+  for (const [name, count] of Object.entries(byProduct)) {
+    if (count > topProductCount) { topProduct = name; topProductCount = count; }
+  }
+
+  const funnel = {
+    quote_sent: deals.filter((d) => d.status === "quote_sent").length,
+    negotiating: deals.filter((d) => d.status === "negotiating").length,
+    confirmed: deals.filter((d) => d.status === "confirmed").length,
+    invoiced: deals.filter((d) => d.status === "invoiced").length,
+  };
+
+  return {
+    total_deals: deals.length,
+    negotiated_deals: negotiated.length,
+    closed_deals: closed.length,
+    win_rate: Math.round(winRate),
+    avg_discount_pct: Math.round(avgDiscountPct * 10) / 10,
+    max_discount_pct: maxDiscount,
+    total_discount_given: Math.round(totalDiscountGiven),
+    margin_protected: Math.round(marginProtected),
+    closed_revenue: Math.round(closed.reduce((s, d) => s + (Number(d.quote.total) || 0), 0)),
+    avg_rounds_to_close: Math.round(avgRounds * 10) / 10,
+    top_negotiated_product: topProduct,
+    top_negotiated_count: topProductCount,
+    funnel,
+  };
+}
+
 // --- Direct seller <-> buyer messages (separate from AI negotiation) ---
 
 async function addDealMessage(dealId, senderRole, message) {
@@ -611,9 +793,16 @@ module.exports = {
   toPublicUser,
   createPasswordResetToken,
   consumePasswordResetToken,
+  createOtpCode,
+  verifyOtpCode,
+  markUserVerified,
   addProduct,
   updateProduct,
   findProductById,
+  addStockNotification,
+  getStockWaitCountsForSeller,
+  getBuyerBackInStock,
+  markBuyerNotificationsSeen,
   getProductsForSeller,
   getAllProductsForBuyers,
   getSellerRules,
@@ -638,4 +827,5 @@ module.exports = {
   getAuditLogForSeller,
   getLedgerForSeller,
   getRevenueStatsForSeller,
+  getDealIntelligenceForSeller,
 };

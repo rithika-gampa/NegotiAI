@@ -1,4 +1,5 @@
 const store = require("../store");
+const { isMailConfigured, sendOtpEmail } = require("../mailer");
 
 // Short-lived cache of session users so every API request doesn't pay a
 // full DB round trip just to re-load the same unchanged user row — on a
@@ -17,18 +18,43 @@ async function getSessionUser(userId) {
   return user;
 }
 
+// Masks a contact value for display ("you@company.com" -> "yo•••@company.com",
+// "9876543210" -> "•••••43210").
+function maskDestination(target, value) {
+  if (target === "email") {
+    const [name, domain] = value.split("@");
+    if (!domain) return value;
+    const shown = name.slice(0, 2);
+    return `${shown}${"•".repeat(Math.max(1, name.length - 2))}@${domain}`;
+  }
+  const digits = value.replace(/\D/g, "");
+  return "•".repeat(Math.max(0, digits.length - 4)) + digits.slice(-4);
+}
+
 // POST /api/auth/signup  { username, password, role, name, email?, mobile? }
+// Requires at least one of email/mobile, then issues a verification code for
+// it instead of logging the user straight in. The session is only established
+// once the code is verified (POST /api/auth/verify-otp).
 async function signup(req, res) {
   const { username, password, role, name, email, mobile } = req.body;
 
   if (!username || !password || !name) {
     return res.status(400).json({ error: "username, password, and name are required" });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
   }
   if (!["buyer", "seller"].includes(role)) {
     return res.status(400).json({ error: 'role must be "buyer" or "seller"' });
+  }
+  if (!mobile) {
+    return res.status(400).json({ error: "A mobile number is required" });
+  }
+  if (!/^\d{10}$/.test(String(mobile).trim())) {
+    return res.status(400).json({ error: "Mobile number must be exactly 10 digits" });
+  }
+  if (email && !/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(String(email).trim())) {
+    return res.status(400).json({ error: "Email must be a Gmail address ending in @gmail.com" });
   }
 
   try {
@@ -36,11 +62,74 @@ async function signup(req, res) {
       return res.status(409).json({ error: "That username is already taken" });
     }
     const user = await store.createUser({ username, password, role, name, email, mobile });
-    req.session.userId = user.id;
-    res.json({ user: store.toPublicUser(user) });
+
+    // Verify email if provided, otherwise mobile.
+    const target = email ? "email" : "mobile";
+    const destination = email ? email.trim().toLowerCase() : mobile.trim();
+    const code = await store.createOtpCode(user.id, target, destination);
+
+    // Real email delivery when SMTP is configured; otherwise demo mode.
+    // SMS isn't wired (needs a provider + DLT), so mobile is always demo mode.
+    const delivered = target === "email" ? await sendOtpEmail(destination, code, user.name) : false;
+
+    res.json({
+      pending_verification: true,
+      user_id: user.id,
+      target,
+      destination_masked: maskDestination(target, destination),
+      delivered,
+      // Only returned when we could NOT actually deliver it (demo mode). When
+      // a real email was sent, the code never leaves the server.
+      demo_code: delivered ? undefined : code,
+    });
   } catch (err) {
     console.error(err);
     res.status(409).json({ error: err.message });
+  }
+}
+
+// POST /api/auth/verify-otp  { user_id, code }
+async function verifyOtp(req, res) {
+  try {
+    const { user_id, code } = req.body;
+    if (!user_id || !code) return res.status(400).json({ error: "user_id and code are required" });
+
+    const result = await store.verifyOtpCode(user_id, code);
+    if (result === "expired") return res.status(400).json({ error: "That code has expired. Request a new one." });
+    if (result !== "ok") return res.status(400).json({ error: "That code isn't right. Check and try again." });
+
+    const user = await store.findUserById(user_id);
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    req.session.userId = user.id; // now verified — log them in
+    res.json({ user: store.toPublicUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Verification failed" });
+  }
+}
+
+// POST /api/auth/resend-otp  { user_id }
+async function resendOtp(req, res) {
+  try {
+    const { user_id } = req.body;
+    if (!user_id) return res.status(400).json({ error: "user_id is required" });
+    const user = await store.findUserById(user_id);
+    if (!user) return res.status(404).json({ error: "Account not found" });
+
+    const target = user.email ? "email" : "mobile";
+    const destination = user.email || user.mobile;
+    if (!destination) return res.status(400).json({ error: "No contact on file to verify" });
+    const code = await store.createOtpCode(user.id, target, destination);
+    const delivered = target === "email" ? await sendOtpEmail(destination, code, user.name) : false;
+    res.json({
+      target,
+      destination_masked: maskDestination(target, destination),
+      delivered,
+      demo_code: delivered ? undefined : code,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not resend code" });
   }
 }
 
@@ -119,8 +208,8 @@ async function resetPassword(req, res) {
     if (!token || !new_password) {
       return res.status(400).json({ error: "token and new_password are required" });
     }
-    if (new_password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
 
     const userId = await store.consumePasswordResetToken(token);
@@ -164,6 +253,8 @@ function requireRole(role) {
 
 module.exports = {
   signup,
+  verifyOtp,
+  resendOtp,
   login,
   logout,
   me,

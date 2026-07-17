@@ -113,10 +113,48 @@ async function getCatalogAndRules(req, res) {
       catalog: await store.getProductsForSeller(req.user.id),
       rules: await store.getSellerRules(req.user.id),
       shop_description: await store.getSellerDescription(req.user.id),
+      wait_counts: await store.getStockWaitCountsForSeller(req.user.id),
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load seller setup" });
+  }
+}
+
+// POST /api/stock-notify  { product_id } — buyer joins an out-of-stock waitlist
+async function subscribeStock(req, res) {
+  try {
+    const { product_id } = req.body;
+    if (!product_id) return res.status(400).json({ error: "product_id is required" });
+    const product = await store.findProductById(product_id);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    const result = await store.addStockNotification(product, req.user);
+    res.json({ ok: true, already: result.already });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to subscribe" });
+  }
+}
+
+// GET /api/my-notifications — buyer's back-in-stock alerts
+async function getMyNotifications(req, res) {
+  try {
+    const notifications = await store.getBuyerBackInStock(req.user.id);
+    res.json({ notifications });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load notifications" });
+  }
+}
+
+// POST /api/my-notifications/seen — dismiss back-in-stock alerts
+async function dismissMyNotifications(req, res) {
+  try {
+    await store.markBuyerNotificationsSeen(req.user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update notifications" });
   }
 }
 
@@ -302,6 +340,17 @@ async function getRevenue(req, res) {
   }
 }
 
+// GET /api/deal-intelligence — AI-negotiation performance analytics
+async function getDealIntelligence(req, res) {
+  try {
+    const stats = await store.getDealIntelligenceForSeller(req.user.id);
+    res.json({ stats });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load deal intelligence" });
+  }
+}
+
 // GET /api/audit-log — compliance audit trail for the logged-in seller
 async function getAuditLog(req, res) {
   try {
@@ -330,5 +379,9 @@ module.exports = {
   sendReminder,
   getLedger,
   getRevenue,
+  getDealIntelligence,
   getAuditLog,
+  subscribeStock,
+  getMyNotifications,
+  dismissMyNotifications,
 };
