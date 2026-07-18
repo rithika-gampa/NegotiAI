@@ -205,19 +205,19 @@ const STYLES = `
   }
   .logout-btn {
     background: transparent;
-    border: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
-    color: color-mix(in srgb, var(--paper) 75%, transparent);
+    border: 1px solid color-mix(in srgb, var(--banner-text) 25%, transparent);
+    color: color-mix(in srgb, var(--banner-text) 75%, transparent);
     padding: 6px 14px;
     border-radius: 999px;
     font-size: 12px;
     cursor: pointer;
   }
-  .logout-btn:hover { border-color: var(--danger); color: var(--paper); }
+  .logout-btn:hover { border-color: var(--danger); color: var(--banner-text); }
   .user-chip {
     display: flex;
     align-items: center;
     gap: 10px;
-    color: color-mix(in srgb, var(--paper) 85%, transparent);
+    color: color-mix(in srgb, var(--banner-text) 85%, transparent);
     font-size: 13px;
   }
   .user-chip-name {
@@ -227,12 +227,25 @@ const STYLES = `
     font: inherit;
     cursor: pointer;
     padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
   }
-  .user-chip-name:hover { color: var(--paper); text-decoration: underline; }
+  .user-chip-name:hover { color: var(--banner-text); text-decoration: underline; }
+  .profile-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--banner-text) 14%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
   .theme-toggle-btn {
     background: transparent;
-    border: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
-    color: color-mix(in srgb, var(--paper) 85%, transparent);
+    border: 1px solid color-mix(in srgb, var(--banner-text) 25%, transparent);
+    color: color-mix(in srgb, var(--banner-text) 85%, transparent);
     padding: 5px 9px;
     border-radius: 999px;
     font-size: 13px;
@@ -244,8 +257,8 @@ const STYLES = `
     position: sticky;
     top: 0;
     z-index: 40;
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--banner-bg);
+    color: var(--banner-text);
     padding: 18px 32px 14px;
     display: flex;
     flex-direction: column;
@@ -269,14 +282,14 @@ const STYLES = `
   .portal-switch {
     display: flex;
     gap: 2px;
-    background: color-mix(in srgb, var(--paper) 8%, transparent);
+    background: color-mix(in srgb, var(--banner-text) 8%, transparent);
     border-radius: 999px;
     padding: 3px;
   }
   .portal-btn {
     background: transparent;
     border: none;
-    color: color-mix(in srgb, var(--paper) 60%, transparent);
+    color: color-mix(in srgb, var(--banner-text) 60%, transparent);
     padding: 8px 18px;
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
@@ -285,13 +298,13 @@ const STYLES = `
     cursor: pointer;
     transition: all 0.15s ease;
   }
-  .portal-btn:hover { color: var(--paper); }
-  .portal-btn.active { background: var(--paper); color: var(--ink); }
+  .portal-btn:hover { color: var(--banner-text); }
+  .portal-btn.active { background: var(--banner-text); color: var(--banner-bg); }
   .tabs { display: flex; gap: 4px; }
   .tab {
     background: transparent;
-    border: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
-    color: color-mix(in srgb, var(--paper) 75%, transparent);
+    border: 1px solid color-mix(in srgb, var(--banner-text) 25%, transparent);
+    color: color-mix(in srgb, var(--banner-text) 75%, transparent);
     padding: 8px 16px;
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
@@ -300,8 +313,8 @@ const STYLES = `
     cursor: pointer;
     transition: all 0.15s ease;
   }
-  .tab:hover { border-color: var(--amber); color: var(--paper); }
-  .tab.active { background: var(--amber); border-color: var(--amber); color: var(--ink); font-weight: 600; }
+  .tab:hover { border-color: var(--amber); color: var(--banner-text); }
+  .tab.active { background: var(--amber); border-color: var(--amber); color: var(--banner-bg); font-weight: 600; }
   .tab-badge {
     display: inline-block;
     background: var(--danger);
@@ -1924,6 +1937,7 @@ function Topbar({ user, tab, setTab, onLogout, newOrderCount, unreadMessages, th
         <div className="brand">Negoti<span>AI</span></div>
         <div className="user-chip">
           <button className="user-chip-name" onClick={onOpenProfile} title="View profile">
+            <span className="profile-icon" aria-hidden="true"><IconUser size={14} /></span>
             {user.name} · {user.role === "seller" ? "Seller" : "Buyer"}
           </button>
           <button className="theme-toggle-btn" onClick={onToggleTheme} aria-label="Toggle dark mode" title="Toggle dark mode">
@@ -2294,6 +2308,9 @@ function IconStore(props) {
 }
 function IconBell(props) {
   return <IconIsvg {...props}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></IconIsvg>;
+}
+function IconUser(props) {
+  return <IconIsvg {...props}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" /></IconIsvg>;
 }
 function IconFurniture(props) {
   return <IconIsvg {...props}><rect x="3" y="6" width="18" height="5" rx="1" /><line x1="5" y1="11" x2="5" y2="19" /><line x1="19" y1="11" x2="19" y2="19" /></IconIsvg>;
