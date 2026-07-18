@@ -9,6 +9,7 @@ const { seedDemoData, seedDemoDeals } = require("./seed");
 
 const { createQuote } = require("./routes/quote");
 const { negotiate } = require("./routes/negotiate");
+const { sellerChat, buyerChat } = require("./routes/assistant");
 const {
   listDeals,
   getDeal,
@@ -17,6 +18,7 @@ const {
   getCatalogAndRules,
   updateSetup,
   addProduct,
+  generateShopDescription,
   listAllProducts,
   acknowledgeDeal,
   getDealMessages,
@@ -41,6 +43,7 @@ const {
   me,
   forgotPassword,
   resetPassword,
+  changePassword,
   requireAuth,
   requireRole,
 } = require("./routes/auth");
@@ -75,6 +78,7 @@ app.post("/api/auth/logout", logout);
 app.get("/api/auth/me", me);
 app.post("/api/auth/forgot-password", forgotPassword);
 app.post("/api/auth/reset-password", resetPassword);
+app.post("/api/auth/change-password", requireAuth, changePassword);
 
 // Marketplace / deals
 app.get("/api/products", requireRole("buyer"), listAllProducts);
@@ -102,6 +106,11 @@ app.post("/api/my-notifications/seen", requireRole("buyer"), dismissMyNotificati
 app.get("/api/setup", requireRole("seller"), getCatalogAndRules);
 app.post("/api/setup", requireRole("seller"), updateSetup);
 app.post("/api/products", requireRole("seller"), addProduct);
+app.post("/api/setup/generate-description", requireRole("seller"), generateShopDescription);
+
+// AI help assistants
+app.post("/api/assistant/seller", requireRole("seller"), sellerChat);
+app.post("/api/assistant/buyer", requireRole("buyer"), buyerChat);
 
 // Serve the frontend (precompiled by build.js — see README)
 app.use(express.static(path.join(__dirname, "..", "public")));

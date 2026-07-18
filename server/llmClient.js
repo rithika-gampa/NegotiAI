@@ -32,8 +32,26 @@ const PROVIDER_CONFIG = {
   },
 };
 
+// Caps how long any single provider attempt can take. Without this, a
+// slow/hanging provider (not just an outright error) would stall the whole
+// negotiation request instead of failing over to the next provider in chain.
+const PROVIDER_TIMEOUT_MS = 12000;
+
+async function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error(`timed out after ${PROVIDER_TIMEOUT_MS}ms`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callOpenAICompatible(config, apiKey, { systemPrompt, userContent }) {
-  const res = await fetch(config.url, {
+  const res = await fetchWithTimeout(config.url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -54,7 +72,7 @@ async function callOpenAICompatible(config, apiKey, { systemPrompt, userContent 
 }
 
 async function callAnthropic(config, apiKey, { systemPrompt, userContent }) {
-  const res = await fetch(config.url, {
+  const res = await fetchWithTimeout(config.url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -75,7 +93,7 @@ async function callAnthropic(config, apiKey, { systemPrompt, userContent }) {
 
 async function callGemini(config, apiKey, { systemPrompt, userContent }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

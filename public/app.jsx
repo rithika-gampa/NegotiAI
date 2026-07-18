@@ -38,6 +38,22 @@ const STYLES = `
     --text: #33414B;
     --text-soft: #5F736E;
     --line: #D8E4E1;
+    /* Fixed (non-flipping) brand-dark banner colors — used by the stat "hero"
+       panels (AI Insights, Finance) so they stay a deliberate dark navy card
+       in both themes instead of inverting to a light card in dark mode. */
+    --banner-bg: #17293A;
+    --banner-text: #F1F6F5;
+  }
+  /* Dark mode: --ink and --paper flip together so every "solid fill + text"
+     pairing (buttons, badges, hero bands) stays internally consistent —
+     see the theme toggle in App() which stamps data-theme on <html>. */
+  :root[data-theme="dark"] {
+    --ink: #E9F1EF;
+    --paper: #0F171E;
+    --paper-raised: #182430;
+    --text: #D6E2DF;
+    --text-soft: #8CA19C;
+    --line: #2A3941;
   }
   * { box-sizing: border-box; }
   @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -189,8 +205,8 @@ const STYLES = `
   }
   .logout-btn {
     background: transparent;
-    border: 1px solid rgba(241,246,245,0.25);
-    color: rgba(241,246,245,0.75);
+    border: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
+    color: color-mix(in srgb, var(--paper) 75%, transparent);
     padding: 6px 14px;
     border-radius: 999px;
     font-size: 12px;
@@ -201,9 +217,29 @@ const STYLES = `
     display: flex;
     align-items: center;
     gap: 10px;
-    color: rgba(241,246,245,0.85);
+    color: color-mix(in srgb, var(--paper) 85%, transparent);
     font-size: 13px;
   }
+  .user-chip-name {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+  .user-chip-name:hover { color: var(--paper); text-decoration: underline; }
+  .theme-toggle-btn {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
+    color: color-mix(in srgb, var(--paper) 85%, transparent);
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .theme-toggle-btn:hover { border-color: var(--amber); }
   .topbar {
     position: sticky;
     top: 0;
@@ -233,14 +269,14 @@ const STYLES = `
   .portal-switch {
     display: flex;
     gap: 2px;
-    background: rgba(241,246,245,0.08);
+    background: color-mix(in srgb, var(--paper) 8%, transparent);
     border-radius: 999px;
     padding: 3px;
   }
   .portal-btn {
     background: transparent;
     border: none;
-    color: rgba(241,246,245,0.6);
+    color: color-mix(in srgb, var(--paper) 60%, transparent);
     padding: 8px 18px;
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
@@ -254,8 +290,8 @@ const STYLES = `
   .tabs { display: flex; gap: 4px; }
   .tab {
     background: transparent;
-    border: 1px solid rgba(241,246,245,0.25);
-    color: rgba(241,246,245,0.75);
+    border: 1px solid color-mix(in srgb, var(--paper) 25%, transparent);
+    color: color-mix(in srgb, var(--paper) 75%, transparent);
     padding: 8px 16px;
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
@@ -406,11 +442,141 @@ const STYLES = `
     transition: all 0.16s ease;
   }
   .shop-card:hover { transform: translateY(-3px); border-color: var(--amber); box-shadow: 0 12px 28px rgba(20,33,61,0.11); }
-  .shop-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-  .shop-card-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+  .shop-card-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .shop-card-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; color: var(--ink); line-height: 1.3; }
   .shop-card-desc { font-size: 13px; color: var(--text-soft); margin: 0; line-height: 1.5; flex: 1; }
   .shop-card-meta { display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-soft); }
+  .shop-card-category-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+    background: rgba(13,148,136,0.1);
+    color: var(--amber-deep);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
   .shop-card-cta { font-size: 13px; font-weight: 600; color: var(--amber-deep); margin-top: 2px; }
+  .shop-card-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .shop-card-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: rgba(13,148,136,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+  }
+  .marketplace-stats-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat-chip {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    box-shadow: 0 1px 3px rgba(20,33,61,0.05);
+  }
+  .stat-chip-value { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 700; color: var(--ink); }
+  .stat-chip-label { font-size: 12px; color: var(--text-soft); }
+  .category-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+  .category-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .category-pill:hover { border-color: var(--amber-deep); }
+  .category-pill.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .category-pill-icon { font-size: 15px; }
+  .category-pill-count { font-family: 'IBM Plex Mono', monospace; font-size: 11px; opacity: 0.65; }
+  .category-section { margin-bottom: 36px; }
+  .category-section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .category-section-icon { font-size: 22px; }
+  .category-section-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; color: var(--ink); margin: 0; }
+  .category-section-count { font-size: 12px; color: var(--text-soft); }
+
+  /* ---- Swiggy-style marketplace: tiles / category rail / clean cards ---- */
+  .stat-tile-row { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+  .stat-tile {
+    flex: 1;
+    min-width: 160px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 22px;
+    box-shadow: 0 1px 3px rgba(20,33,61,0.05);
+  }
+  .stat-tile.highlight { background: rgba(13,148,136,0.12); border-color: rgba(13,148,136,0.28); }
+  .stat-tile-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-soft); margin-bottom: 8px; }
+  .stat-tile.highlight .stat-tile-label { color: var(--amber-deep); }
+  .stat-tile-value { font-family: 'Fraunces', serif; font-size: 27px; font-weight: 700; color: var(--ink); line-height: 1; }
+  .stat-tile.highlight .stat-tile-value { color: var(--amber-deep); }
+
+  .category-rail { display: flex; gap: 22px; overflow-x: auto; padding: 4px 2px 10px; margin-bottom: 26px; }
+  .category-rail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+  .category-rail-icon {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: var(--paper-raised);
+    border: 2px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-soft);
+    transition: all 0.15s ease;
+  }
+  .category-rail-item:hover .category-rail-icon { border-color: var(--amber-deep); color: var(--amber-deep); }
+  .category-rail-item.active .category-rail-icon { border-color: var(--amber); background: rgba(13,148,136,0.14); color: var(--amber-deep); }
+  .category-rail-label { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  .category-rail-item.active .category-rail-label { color: var(--amber-deep); }
+
+  .shop-card-v2 {
+    background: var(--paper-raised);
+    border: none;
+    border-radius: 16px;
+    padding: 20px 22px;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(20,33,61,0.06);
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .shop-card-v2:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(20,33,61,0.1); }
+  .shop-card-v2-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .shop-card-v2-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  .badge-pill { font-size: 10.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+  .badge-pill.outline { border: 1.5px solid var(--amber); color: var(--amber-deep); background: rgba(13,148,136,0.06); }
+  .badge-pill.solid { background: var(--amber); color: var(--ink); }
+  .badge-pill.muted { border: 1px solid var(--line); color: var(--text-soft); }
+  .shop-card-v2-meta { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--text-soft); }
+  .shop-card-v2-cta { font-size: 13px; font-weight: 700; color: var(--amber-deep); margin-top: 4px; }
   .product-card.out-of-stock { opacity: 0.6; }
   .product-card.out-of-stock .product-stock { color: var(--danger); }
   .notify-btn {
@@ -426,6 +592,10 @@ const STYLES = `
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
   .notify-btn:hover:not(:disabled) { background: rgba(13,148,136,0.08); }
   .notify-btn:disabled { border-color: var(--success); color: var(--success); cursor: default; }
@@ -441,11 +611,13 @@ const STYLES = `
     font-size: 14px;
     color: var(--text);
   }
-  .restock-bell { font-size: 18px; }
+  .restock-bell { display: flex; align-items: center; color: var(--amber-deep); flex-shrink: 0; }
   .restock-dismiss { background: none; border: none; color: var(--text-soft); font-size: 15px; cursor: pointer; padding: 2px 6px; }
   .restock-dismiss:hover { color: var(--ink); }
   .wait-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     background: rgba(13,148,136,0.12);
     color: var(--amber-deep);
     font-size: 11px;
@@ -511,7 +683,7 @@ const STYLES = `
     border-radius: 999px;
     white-space: nowrap;
   }
-  .card-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .payment-badge {
     display: inline-block;
     font-size: 10px;
@@ -535,15 +707,15 @@ const STYLES = `
     box-shadow: 0 2px 8px rgba(20,33,61,0.06);
   }
   .fin-hero-main {
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--banner-bg);
+    color: var(--banner-text);
     padding: 28px 32px;
   }
   .fin-hero-label {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(241,246,245,0.6);
+    color: color-mix(in srgb, var(--banner-text) 60%, transparent);
     margin-bottom: 10px;
   }
   .fin-hero-value {
@@ -554,7 +726,7 @@ const STYLES = `
     color: var(--amber);
     margin-bottom: 12px;
   }
-  .fin-hero-sub { font-size: 13px; color: rgba(241,246,245,0.8); }
+  .fin-hero-sub { font-size: 13px; color: color-mix(in srgb, var(--banner-text) 80%, transparent); }
   .fin-hero-gauge {
     background: var(--paper-raised);
     padding: 28px 32px;
@@ -617,11 +789,11 @@ const STYLES = `
     margin-bottom: 24px;
     box-shadow: 0 2px 8px rgba(20,33,61,0.06);
   }
-  .di-hero-main { background: var(--ink); color: var(--paper); padding: 28px 32px; display: flex; align-items: center; gap: 26px; }
+  .di-hero-main { background: var(--banner-bg); color: var(--banner-text); padding: 28px 32px; display: flex; align-items: center; gap: 26px; }
   .di-donut { flex-shrink: 0; }
-  .di-hero-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(241,246,245,0.6); margin-bottom: 8px; }
+  .di-hero-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: color-mix(in srgb, var(--banner-text) 60%, transparent); margin-bottom: 8px; }
   .di-hero-value { font-family: 'Fraunces', serif; font-size: 40px; font-weight: 600; line-height: 1; color: var(--amber); margin-bottom: 10px; }
-  .di-hero-sub { font-size: 13px; color: rgba(241,246,245,0.8); line-height: 1.5; }
+  .di-hero-sub { font-size: 13px; color: color-mix(in srgb, var(--banner-text) 80%, transparent); line-height: 1.5; }
   .di-hero-gauge { background: var(--paper-raised); padding: 26px 30px; display: flex; flex-direction: column; justify-content: center; }
   .di-gauge-value { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 700; color: var(--success); }
   .di-bar-track { background: rgba(20,33,61,0.08); border-radius: 999px; height: 12px; overflow: hidden; margin: 10px 0 6px; position: relative; }
@@ -685,22 +857,25 @@ const STYLES = `
     gap: 6px;
     flex-wrap: wrap;
   }
-  .dc-name { font-weight: 600; color: var(--ink); font-size: 13px; }
-  .dc-sku { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-soft); margin-top: 1px; margin-bottom: 6px; }
+  .dc-name { font-family: 'Fraunces', serif; font-weight: 600; color: var(--ink); font-size: 14.5px; line-height: 1.25; }
+  .dc-sku { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--text-soft); margin-top: 3px; margin-bottom: 8px; }
   .card-btn {
     background: var(--paper-raised);
     border: 1px solid var(--line);
     color: var(--text);
     font-family: 'Inter', sans-serif;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
-    padding: 5px 11px;
+    padding: 6px 13px;
     border-radius: 999px;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.15s ease;
   }
   .card-btn:hover { border-color: var(--amber-deep); color: var(--amber-deep); background: rgba(13,148,136,0.08); }
+  .card-btn.primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .card-btn.primary:hover { opacity: 0.88; background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .main.wide { max-width: 1180px; }
   .tabs-row {
     display: flex;
     align-items: center;
@@ -794,6 +969,21 @@ const STYLES = `
     resize: vertical;
   }
   textarea.shop-desc-input:focus { outline: 2px solid var(--amber); outline-offset: 1px; border-color: var(--amber); }
+  .ai-generate-btn {
+    background: rgba(13,148,136,0.08);
+    border: 1px solid var(--amber);
+    color: var(--amber-deep);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 13px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .ai-generate-btn:hover:not(:disabled) { background: rgba(13,148,136,0.16); }
+  .ai-generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   .row { display: flex; gap: 16px; }
   .row > * { flex: 1; }
   .btn {
@@ -887,9 +1077,9 @@ const STYLES = `
   }
   .suggest-chip:hover { background: rgba(13,148,136,0.18); }
   .neg-savings { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--success); }
-  .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .pcol { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-height: 200px; }
-  .pcol h4 { font-family: 'Fraunces', serif; font-size: 14px; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 2px solid; }
+  .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .pcol { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-height: 200px; box-shadow: 0 1px 3px rgba(20,33,61,0.05); }
+  .pcol h4 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid; }
   .pcol.quote_sent h4 { border-color: var(--text-soft); }
   .pcol.negotiating h4 { border-color: var(--amber); }
   .pcol.confirmed h4 { border-color: var(--success); }
@@ -897,17 +1087,18 @@ const STYLES = `
   .deal-card {
     background: var(--paper);
     border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    font-size: 12px;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    font-size: 12.5px;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
-  .deal-card:hover { border-color: var(--amber); }
+  .deal-card:hover { border-color: var(--amber); box-shadow: 0 4px 12px rgba(20,33,61,0.08); transform: translateY(-1px); }
   .deal-card.read-only { cursor: default; }
-  .deal-card.read-only:hover { border-color: var(--line); }
+  .deal-card.read-only:hover { border-color: var(--line); box-shadow: none; transform: none; }
   .deal-card .sku { font-weight: 600; color: var(--ink); }
-  .deal-card .amt { font-family: 'IBM Plex Mono', monospace; color: var(--text-soft); margin-top: 4px; }
+  .deal-card .amt { font-family: 'IBM Plex Mono', monospace; color: var(--ink); font-weight: 600; font-size: 12.5px; margin-top: 6px; }
   .empty { color: var(--text-soft); font-size: 12px; text-align: center; padding: 20px 0; }
   .error-box { background: rgba(178,58,72,0.08); border: 1px solid rgba(178,58,72,0.3); color: var(--danger); padding: 12px 16px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
   .edit-row {
@@ -979,6 +1170,24 @@ const STYLES = `
   .invoice-total-row { display: flex; justify-content: flex-end; gap: 24px; font-family: 'IBM Plex Mono', monospace; padding-top: 8px; }
   .invoice-total-row .amount { font-size: 24px; color: var(--ink); }
   .print-btn { margin-top: 24px; }
+  .floating-assistant { position: fixed; right: 24px; bottom: 24px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+  .floating-assistant-btn {
+    width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--ink); color: var(--paper); font-size: 22px;
+    box-shadow: 0 8px 24px rgba(27,31,42,0.28); display: flex; align-items: center; justify-content: center;
+  }
+  .floating-assistant-btn:hover { background: var(--amber-deep); }
+  .floating-assistant-panel {
+    width: min(360px, calc(100vw - 48px)); background: var(--paper); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 16px 40px rgba(27,31,42,0.22); display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .floating-assistant-head {
+    display: flex; align-items: center; justify-content: space-between; padding: 14px 16px;
+    background: var(--ink); color: var(--paper); font-family: 'Fraunces', serif; font-size: 15px;
+  }
+  .floating-assistant-head .close-btn { position: static; background: transparent; border: none; font-size: 16px; cursor: pointer; color: var(--paper); }
+  .floating-assistant-body { padding: 14px 16px 16px; }
   @media print {
     body * { visibility: hidden; }
     .invoice-sheet, .invoice-sheet * { visibility: visible; }
@@ -1000,7 +1209,7 @@ const STYLES = `
     align-items: center;
     justify-content: space-between;
     padding: 16px 40px;
-    background: rgba(241,246,245,0.88);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
@@ -1078,7 +1287,7 @@ const STYLES = `
     box-shadow: 0 16px 36px rgba(20,33,61,0.3);
     transform: rotate(-2deg);
   }
-  .hero-quote-float .quote-line { color: rgba(241,246,245,0.7); gap: 18px; }
+  .hero-quote-float .quote-line { color: color-mix(in srgb, var(--paper) 70%, transparent); gap: 18px; }
   .hero-quote-float .total { color: var(--amber); font-size: 18px; font-weight: 600; margin-top: 6px; }
   .land-section { max-width: 1100px; margin: 0 auto; padding: 24px 40px 0; width: 100%; }
   .land-kicker {
@@ -1147,7 +1356,7 @@ const STYLES = `
     color: var(--paper);
     margin: 0 0 12px;
   }
-  .cta-band p { position: relative; color: rgba(241,246,245,0.75); font-size: 15px; margin: 0 auto 28px; max-width: 480px; }
+  .cta-band p { position: relative; color: color-mix(in srgb, var(--paper) 75%, transparent); font-size: 15px; margin: 0 auto 28px; max-width: 480px; }
   .cta-band .btn { position: relative; }
   .landing-footer {
     border-top: 1px solid var(--line);
@@ -1284,7 +1493,7 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
     e.preventDefault();
     setError(null);
     if (!/^\d{10}$/.test(mobile.trim())) {
-      setError("Mobile number must be exactly 10 digits.");
+      setError("Mobile number is required and must be exactly 10 digits.");
       return;
     }
     if (email.trim() && !/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(email.trim())) {
@@ -1304,11 +1513,8 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
-      // New accounts must verify their email/mobile before the session starts.
-      setVerifyState({ userId: data.user_id, target: data.target, dest: data.destination_masked, demoCode: data.demo_code, delivered: data.delivered });
-      setOtp("");
-      setError(null);
-      setMode("verify");
+      // OTP verification is temporarily disabled — signup logs straight in.
+      onAuthed(data.user);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1473,10 +1679,6 @@ function AuthScreen({ onAuthed, initialMode = "login", onBack }) {
 
             <label>Username <span className="required-mark">*</span></label>
             <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. meridian_retail" autoComplete="off" required />
-
-            <div style={{ fontSize: "12px", color: "var(--text-soft)", margin: "0 0 10px" }}>
-              We'll send a verification code to confirm your account.
-            </div>
 
             <label>Mobile <span className="required-mark">*</span></label>
             <input
@@ -1699,7 +1901,7 @@ function MessageIcon() {
   );
 }
 
-function Topbar({ user, tab, setTab, onLogout, newOrderCount, unreadMessages }) {
+function Topbar({ user, tab, setTab, onLogout, newOrderCount, unreadMessages, theme, onToggleTheme, onOpenProfile }) {
   const tabsByPortal = {
     buyer: [
       { id: "rfq", label: "Request Quote" },
@@ -1721,7 +1923,12 @@ function Topbar({ user, tab, setTab, onLogout, newOrderCount, unreadMessages }) 
       <div className="topbar-row">
         <div className="brand">Negoti<span>AI</span></div>
         <div className="user-chip">
-          <span>{user.name} · {user.role === "seller" ? "Seller" : "Buyer"}</span>
+          <button className="user-chip-name" onClick={onOpenProfile} title="View profile">
+            {user.name} · {user.role === "seller" ? "Seller" : "Buyer"}
+          </button>
+          <button className="theme-toggle-btn" onClick={onToggleTheme} aria-label="Toggle dark mode" title="Toggle dark mode">
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
           <button className="logout-btn" onClick={onLogout}>Log out</button>
         </div>
       </div>
@@ -1762,12 +1969,30 @@ function SellerSetup({ catalog, rules, shopDescription, waitCounts, onSaved }) {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newStock, setNewStock] = useState("");
+  const [newCategory, setNewCategory] = useState("Other");
   const [addingProduct, setAddingProduct] = useState(false);
   const [addError, setAddError] = useState(null);
+  const [generatingDesc, setGeneratingDesc] = useState(false);
 
   useEffect(() => setLocalCatalog(catalog), [catalog]);
   useEffect(() => setLocalRules(rules), [rules]);
   useEffect(() => setLocalDescription(shopDescription || ""), [shopDescription]);
+
+  async function generateDescription() {
+    setGeneratingDesc(true);
+    try {
+      const res = await fetch("/api/setup/generate-description", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate a description");
+      setLocalDescription(data.description);
+      setSaved(false);
+      showToast("AI drafted a description — review it, then Save Changes");
+    } catch (err) {
+      showToast(err.message || "Couldn't generate a description", "error");
+    } finally {
+      setGeneratingDesc(false);
+    }
+  }
 
   function updateProduct(id, field, value) {
     setLocalCatalog((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
@@ -1794,7 +2019,7 @@ function SellerSetup({ catalog, rules, shopDescription, waitCounts, onSaved }) {
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim(), base_price: Number(newPrice), stock: Number(newStock) }),
+        body: JSON.stringify({ name: newName.trim(), base_price: Number(newPrice), stock: Number(newStock), category: newCategory }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add product");
@@ -1853,7 +2078,12 @@ function SellerSetup({ catalog, rules, shopDescription, waitCounts, onSaved }) {
         <p style={{ fontSize: "13px", color: "var(--text-soft)", margin: "0 0 14px" }}>
           A short line buyers see under your name on the marketplace. Describe what you sell.
         </p>
-        <label>Shop description</label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+          <label style={{ marginBottom: 0 }}>Shop description</label>
+          <button type="button" className="ai-generate-btn" onClick={generateDescription} disabled={generatingDesc}>
+            {generatingDesc ? "Generating..." : "✨ Generate with AI"}
+          </button>
+        </div>
         <textarea
           className="shop-desc-input"
           value={localDescription}
@@ -1875,11 +2105,23 @@ function SellerSetup({ catalog, rules, shopDescription, waitCounts, onSaved }) {
               {p.name} <span style={{ color: "var(--text-soft)" }}>({p.sku})</span>
               {waitCounts && waitCounts[p.id] > 0 && (
                 <span className="wait-badge" title="Buyers waiting for this to come back in stock">
-                  🔔 {waitCounts[p.id]} waiting
+                  <IconBell size={11} /> {waitCounts[p.id]} waiting
                 </span>
               )}
             </div>
             <div className="edit-row-fields">
+              <div>
+                <label style={{ marginBottom: "4px" }}>Category</label>
+                <select
+                  value={p.category || "Other"}
+                  onChange={(e) => updateProduct(p.id, "category", e.target.value)}
+                  style={{ marginBottom: 0, width: "150px" }}
+                >
+                  {CATEGORY_ORDER.map((c) => (
+                    <option key={c} value={c}>{categoryIcon(c)} {c}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label style={{ marginBottom: "4px" }}>Price (₹)</label>
                 <input
@@ -1906,6 +2148,14 @@ function SellerSetup({ catalog, rules, shopDescription, waitCounts, onSaved }) {
           <div>
             <label style={{ marginBottom: "4px" }}>New product name</label>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Bubble Wrap Roll" style={{ marginBottom: 0 }} />
+          </div>
+          <div>
+            <label style={{ marginBottom: "4px" }}>Category</label>
+            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} style={{ marginBottom: 0, width: "150px" }}>
+              {CATEGORY_ORDER.map((c) => (
+                <option key={c} value={c}>{categoryIcon(c)} {c}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label style={{ marginBottom: "4px" }}>Price (₹)</label>
@@ -1997,6 +2247,76 @@ function textMatches(text, query) {
   return new RegExp("\\b" + escaped, "i").test(text);
 }
 
+const CATEGORY_ORDER = ["Stationery", "Grocery", "Food & Catering", "Electricals", "Packaging", "Furniture", "Textiles", "Other"];
+const CATEGORY_ICON = {
+  "Stationery": "✏️",
+  "Grocery": "🛒",
+  "Food & Catering": "🍽️",
+  "Electricals": "🔌",
+  "Packaging": "📦",
+  "Furniture": "🪑",
+  "Textiles": "🧶",
+  "Other": "🗂️",
+};
+function categoryIcon(cat) {
+  return CATEGORY_ICON[cat] || CATEGORY_ICON.Other;
+}
+
+// Clean stroke-based SVG icons, colored via currentColor, replacing native
+// emoji glyphs in the category rail / shop headers — emoji render
+// inconsistently across OS/browsers and clash with the app's teal palette.
+// (Native <select><option> text can't hold SVG/JSX, so categoryIcon() above
+// — the emoji-string version — is kept for those two dropdowns only.)
+function IconIsvg({ children, size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+}
+function IconStationery(props) {
+  return <IconIsvg {...props}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" /></IconIsvg>;
+}
+function IconGrocery(props) {
+  return <IconIsvg {...props}><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></IconIsvg>;
+}
+function IconFood(props) {
+  return <IconIsvg {...props}><path d="M3 2v7c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></IconIsvg>;
+}
+function IconElectric(props) {
+  return <IconIsvg {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></IconIsvg>;
+}
+function IconTag(props) {
+  return <IconIsvg {...props}><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" /><circle cx="7" cy="7" r="1.4" fill="currentColor" stroke="none" /></IconIsvg>;
+}
+function IconStore(props) {
+  return <IconIsvg {...props}><path d="M3 9l1-6h16l1 6" /><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0" /><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" /><path d="M9 21v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6" /></IconIsvg>;
+}
+function IconBell(props) {
+  return <IconIsvg {...props}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></IconIsvg>;
+}
+function IconFurniture(props) {
+  return <IconIsvg {...props}><rect x="3" y="6" width="18" height="5" rx="1" /><line x1="5" y1="11" x2="5" y2="19" /><line x1="19" y1="11" x2="19" y2="19" /></IconIsvg>;
+}
+function IconTextile(props) {
+  return <IconIsvg {...props}><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 .55.45 1 1 1h10a1 1 0 0 0 1-1V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" /></IconIsvg>;
+}
+
+const CATEGORY_SVG_ICON = {
+  "Stationery": IconStationery,
+  "Grocery": IconGrocery,
+  "Food & Catering": IconFood,
+  "Electricals": IconElectric,
+  "Packaging": IconTag,
+  "Furniture": IconFurniture,
+  "Textiles": IconTextile,
+  "Other": IconTag,
+};
+function CategoryIcon({ category, size }) {
+  const Cmp = CATEGORY_SVG_ICON[category] || IconTag;
+  return <Cmp size={size} />;
+}
+
 function RFQForm({ onQuoteCreated }) {
   const [products, setProducts] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -2012,6 +2332,7 @@ function RFQForm({ onQuoteCreated }) {
   const [productQuery, setProductQuery] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [activeCategory, setActiveCategory] = useState(null);
   const [notified, setNotified] = useState([]); // buyer's own waitlist product ids (this session)
   const [backInStock, setBackInStock] = useState([]); // back-in-stock alerts
 
@@ -2117,19 +2438,18 @@ function RFQForm({ onQuoteCreated }) {
   }, {});
   const shops = Object.values(shopsById).map((s) => {
     const prices = s.products.map((p) => p.base_price);
-    return { ...s, count: s.products.length, priceMin: Math.min(...prices), priceMax: Math.max(...prices) };
+    // A shop's "category" is whichever category most of its products belong
+    // to — lets the marketplace group shops without requiring every seller
+    // to carry a single, explicitly-tagged category.
+    const catCounts = {};
+    for (const p of s.products) catCounts[p.category || "Other"] = (catCounts[p.category || "Other"] || 0) + 1;
+    const category = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
+    return { ...s, count: s.products.length, priceMin: Math.min(...prices), priceMax: Math.max(...prices), category };
   });
-
-  const header = (
-    <>
-      <h2 className="panel-title">Browse & Request a Quote</h2>
-      <p className="panel-sub">Buy direct from any seller on the marketplace — no marketplace commissions, no middleman. Pick a shop, choose a product, and get an instant, itemized quote.</p>
-    </>
-  );
 
   const banner = backInStock.length > 0 ? (
     <div className="restock-banner">
-      <span className="restock-bell">🔔</span>
+      <span className="restock-bell"><IconBell size={18} /></span>
       <div style={{ flex: 1 }}>
         <strong>Back in stock: </strong>
         {backInStock.map((n) => n.product_name).join(", ")} — you asked to be notified.
@@ -2139,10 +2459,10 @@ function RFQForm({ onQuoteCreated }) {
   ) : null;
 
   if (loadingProducts && products.length === 0) {
-    return <div className="main">{header}<div className="card"><p className="empty" style={{ padding: "8px 0" }}>Loading the marketplace...</p></div></div>;
+    return <div className="main"><div className="card"><p className="empty" style={{ padding: "8px 0" }}>Loading the marketplace...</p></div></div>;
   }
   if (!loadingProducts && products.length === 0) {
-    return <div className="main">{header}<div className="card"><p className="empty" style={{ padding: "8px 0" }}>No sellers have listed products yet.</p></div></div>;
+    return <div className="main"><div className="card"><p className="empty" style={{ padding: "8px 0" }}>No sellers have listed products yet.</p></div></div>;
   }
 
   // ---- Shop detail view ----
@@ -2157,13 +2477,15 @@ function RFQForm({ onQuoteCreated }) {
     else if (sortBy === "name") shopProducts = [...shopProducts].sort((a, b) => a.name.localeCompare(b.name));
 
     return (
-      <div className="main">
+      <div className="main wide">
         {banner}
         <button className="back-link" onClick={backToShops}>← All shops</button>
 
         <div className="shop-header">
           <div className="seller-group-info">
-            <h2 className="panel-title" style={{ margin: 0 }}>{openShopObj.seller_name}</h2>
+            <h2 className="panel-title" style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: "10px" }}>
+              <CategoryIcon category={openShopObj.category} size={22} /> {openShopObj.seller_name}
+            </h2>
             {openShopObj.description && <p className="seller-group-desc" style={{ fontSize: "14px", marginTop: "4px" }}>{openShopObj.description}</p>}
           </div>
           <span className={"trust-badge" + (openShopObj.verified ? " verified" : "")}>
@@ -2215,7 +2537,7 @@ function RFQForm({ onQuoteCreated }) {
                     disabled={notified.includes(p.id)}
                     onClick={(e) => { e.stopPropagation(); notifyMe(p); }}
                   >
-                    {notified.includes(p.id) ? "✓ On the waitlist" : "🔔 Notify me when back"}
+                    {notified.includes(p.id) ? "✓ On the waitlist" : <><IconBell size={13} /> Notify me when back</>}
                   </button>
                 )}
               </div>
@@ -2255,19 +2577,58 @@ function RFQForm({ onQuoteCreated }) {
 
   // ---- Shops directory view ----
   const sq = shopQuery.trim();
-  const visibleShops = sq
-    ? shops.filter(
-        (s) =>
-          textMatches(s.seller_name, sq) ||
-          textMatches(s.description, sq) ||
-          s.products.some((p) => textMatches(p.name, sq))
-      )
-    : shops;
+  let visibleShops = shops;
+  if (activeCategory) visibleShops = visibleShops.filter((s) => s.category === activeCategory);
+  if (sq) {
+    visibleShops = visibleShops.filter(
+      (s) =>
+        textMatches(s.seller_name, sq) ||
+        textMatches(s.description, sq) ||
+        s.products.some((p) => textMatches(p.name, sq))
+    );
+  }
+
+  const categoryCounts = {};
+  for (const s of shops) categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1;
+  const presentCategories = CATEGORY_ORDER.filter((c) => categoryCounts[c] > 0);
+  const verifiedCount = shops.filter((s) => s.verified).length;
+
+  function renderShopCard(s) {
+    // A simple, honest trust ladder computed from real completed-deal counts
+    // (no fabricated numbers): more closed deals = a stronger badge.
+    const badge =
+      s.completed >= 5 ? { cls: "solid", label: "★ Top Negotiator" } :
+      s.verified ? { cls: "outline", label: "✓ Verified" } :
+      { cls: "muted", label: "New" };
+
+    return (
+      <div key={s.seller_id} className="shop-card-v2" onClick={() => openShop(s.seller_id)}>
+        <div className="shop-card-v2-top">
+          <span className="shop-card-v2-name">{s.seller_name}</span>
+          <span className={"badge-pill " + badge.cls}>{badge.label}</span>
+        </div>
+        <div className="shop-card-v2-meta">
+          {s.count} product{s.count === 1 ? "" : "s"} · {s.priceMin === s.priceMax ? `₹${s.priceMin}` : `₹${s.priceMin.toLocaleString()}–₹${s.priceMax.toLocaleString()}`}
+        </div>
+        <div className="shop-card-v2-cta">Browse shop →</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="main">
-      {header}
+    <div className="main wide">
       {banner}
+
+      <div className="stat-tile-row">
+        <div className="stat-tile">
+          <div className="stat-tile-label">Sellers</div>
+          <div className="stat-tile-value">{shops.length}</div>
+        </div>
+        <div className="stat-tile highlight">
+          <div className="stat-tile-label">Verified Sellers</div>
+          <div className="stat-tile-value">{verifiedCount}</div>
+        </div>
+      </div>
 
       <div className="marketplace-toolbar">
         <div className="search-field">
@@ -2281,34 +2642,35 @@ function RFQForm({ onQuoteCreated }) {
         </div>
       </div>
 
+      <div className="category-rail">
+        <button className={"category-rail-item" + (!activeCategory ? " active" : "")} onClick={() => setActiveCategory(null)}>
+          <span className="category-rail-icon"><IconStore size={24} /></span>
+          <span className="category-rail-label">All</span>
+        </button>
+        {presentCategories.map((cat) => (
+          <button
+            key={cat}
+            className={"category-rail-item" + (activeCategory === cat ? " active" : "")}
+            onClick={() => setActiveCategory(cat)}
+          >
+            <span className="category-rail-icon"><CategoryIcon category={cat} size={24} /></span>
+            <span className="category-rail-label">{cat}</span>
+          </button>
+        ))}
+      </div>
+
       {visibleShops.length === 0 ? (
-        <div className="card"><p className="empty" style={{ padding: "8px 0" }}>No shops match “{shopQuery}”. Try a different search.</p></div>
+        <div className="card"><p className="empty" style={{ padding: "8px 0" }}>
+          {sq ? `No shops match "${shopQuery}". Try a different search.` : "No shops in this category yet."}
+        </p></div>
       ) : (
-        <div className="shop-grid">
-          {visibleShops.map((s) => (
-            <div key={s.seller_id} className="shop-card" onClick={() => openShop(s.seller_id)}>
-              <div className="shop-card-head">
-                <span className="shop-card-name">{s.seller_name}</span>
-                <span className={"trust-badge" + (s.verified ? " verified" : "")}>
-                  {s.verified ? "✓ Verified" : "New"}
-                </span>
-              </div>
-              {s.description && <p className="shop-card-desc">{s.description}</p>}
-              <div className="shop-card-meta">
-                <span>{s.count} product{s.count === 1 ? "" : "s"}</span>
-                <span>·</span>
-                <span>{s.priceMin === s.priceMax ? `₹${s.priceMin}` : `₹${s.priceMin.toLocaleString()}–₹${s.priceMax.toLocaleString()}`}</span>
-              </div>
-              <div className="shop-card-cta">Browse shop →</div>
-            </div>
-          ))}
-        </div>
+        <div className="shop-grid">{visibleShops.map(renderShopCard)}</div>
       )}
     </div>
   );
 }
 
-function NegotiationChat({ deals, dealId, onSelectDeal, refreshDeals }) {
+function NegotiationChat({ deals, dealId, onSelectDeal, onDealPatched }) {
   const [deal, setDeal] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2323,6 +2685,7 @@ function NegotiationChat({ deals, dealId, onSelectDeal, refreshDeals }) {
     const res = await fetch(`/api/deals/${id}`);
     const data = await res.json();
     if (res.ok) setDeal(data.deal);
+    return res.ok ? data.deal : null;
   }
 
   useEffect(() => {
@@ -2358,8 +2721,8 @@ function NegotiationChat({ deals, dealId, onSelectDeal, refreshDeals }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Negotiation failed");
-      await loadDeal(dealId);
-      refreshDeals?.();
+      const updated = await loadDeal(dealId);
+      if (updated) onDealPatched?.(dealId, updated);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -2491,11 +2854,42 @@ function NegotiationChat({ deals, dealId, onSelectDeal, refreshDeals }) {
   );
 }
 
-function InvoicePreview({ dealId, onClose }) {
-  const [invoice, setInvoice] = useState(null);
+// Builds the same invoice shape the server's GET /api/deals/:id/invoice
+// returns, but from a deal object the caller already has in memory (from the
+// deals list) — so opening an invoice is instant with no network round trip
+// and no loading flash. Falls back to a live fetch only if the deal wasn't
+// already loaded (e.g. a direct link).
+function buildInvoiceFromDeal(deal) {
+  const q = deal.quote;
+  return {
+    invoice_number: deal.invoice_number,
+    invoiced_at: deal.invoiced_at,
+    buyer_name: deal.buyer_name,
+    line_items: [
+      {
+        description: q.product_name || deal.sku,
+        sku: deal.sku,
+        quantity: q.quantity,
+        original_unit_price: q.base_price,
+        original_total: +(q.base_price * q.quantity).toFixed(2),
+        unit_price: q.unit_price,
+        discount_percent: q.discount_percent,
+        total: q.total,
+      },
+    ],
+    total_savings: +(q.base_price * q.quantity - q.total).toFixed(2),
+    total: q.total,
+  };
+}
+
+function InvoicePreview({ dealId, deals, onClose }) {
+  const fromMemory = deals?.find((d) => d.id === dealId && d.status === "invoiced");
+  const [invoice, setInvoice] = useState(fromMemory ? buildInvoiceFromDeal(fromMemory) : null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Already have everything we need locally — skip the network round trip.
+    if (fromMemory) return;
     fetch(`/api/deals/${dealId}/invoice`)
       .then((res) => res.json())
       .then((data) => {
@@ -2842,7 +3236,7 @@ function Pipeline({ deals, refresh, readOnly, onReorder, onMessage }) {
   }
 
   return (
-    <div className="main">
+    <div className="main wide">
       <div className="storefront-head">
         <div>
           <h2 className="panel-title">{readOnly ? "My Orders" : "Deal Pipeline"}</h2>
@@ -2903,11 +3297,11 @@ function Pipeline({ deals, refresh, readOnly, onReorder, onMessage }) {
                 {!readOnly && (
                   <div className="card-actions">
                     {!d.seller_acknowledged && (
-                      <button className="card-btn" onClick={(e) => { e.stopPropagation(); acknowledge(d.id); }}>Acknowledge</button>
+                      <button className="card-btn primary" onClick={(e) => { e.stopPropagation(); acknowledge(d.id); }}>Acknowledge</button>
                     )}
                     {col.id === "invoiced" && d.payment_status !== "paid" && (
                       <>
-                        <button className="card-btn" onClick={(e) => { e.stopPropagation(); markPaid(d.id); }}>Mark paid</button>
+                        <button className="card-btn primary" onClick={(e) => { e.stopPropagation(); markPaid(d.id); }}>Mark paid</button>
                         <button className="card-btn" onClick={(e) => { e.stopPropagation(); sendReminder(d.id); }}>Send reminder</button>
                       </>
                     )}
@@ -2978,7 +3372,7 @@ function Pipeline({ deals, refresh, readOnly, onReorder, onMessage }) {
         </div>
       )}
 
-      {invoiceDealId && <InvoicePreview dealId={invoiceDealId} onClose={() => setInvoiceDealId(null)} />}
+      {invoiceDealId && <InvoicePreview dealId={invoiceDealId} deals={deals} onClose={() => setInvoiceDealId(null)} />}
       {negotiationDealId && <NegotiationHistoryModal dealId={negotiationDealId} onClose={() => setNegotiationDealId(null)} />}
     </div>
   );
@@ -2988,16 +3382,136 @@ function WinRateDonut({ pct }) {
   const r = 15.9155; // circumference = 100
   return (
     <svg className="di-donut" width="112" height="112" viewBox="0 0 36 36">
-      <circle cx="18" cy="18" r={r} fill="none" stroke="rgba(241,246,245,0.18)" strokeWidth="3.2" />
+      <circle cx="18" cy="18" r={r} fill="none" stroke="color-mix(in srgb, var(--banner-text) 18%, transparent)" strokeWidth="3.2" />
       <circle
-        cx="18" cy="18" r={r} fill="none" stroke="#0D9488" strokeWidth="3.2"
+        cx="18" cy="18" r={r} fill="none" stroke="var(--amber)" strokeWidth="3.2"
         strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset="25" strokeLinecap="round"
       />
       <text x="18" y="18.7" textAnchor="middle" dominantBaseline="middle"
-        fontFamily="'IBM Plex Mono', monospace" fontSize="8" fontWeight="700" fill="#F1F6F5">{pct}%</text>
+        fontFamily="'IBM Plex Mono', monospace" fontSize="8" fontWeight="700" fill="var(--banner-text)">{pct}%</text>
       <text x="18" y="23.5" textAnchor="middle" dominantBaseline="middle"
-        fontFamily="Inter, sans-serif" fontSize="2.6" fill="rgba(241,246,245,0.6)">WIN RATE</text>
+        fontFamily="Inter, sans-serif" fontSize="2.6" fill="color-mix(in srgb, var(--banner-text) 60%, transparent)">WIN RATE</text>
     </svg>
+  );
+}
+
+// Shared chat core for both the seller's embedded "Ask AI" panel and the
+// buyer's floating help widget — same message list, input, and network call,
+// just mounted in different chrome around it.
+function AssistantChat({ endpoint, placeholder, suggestions, emptyText }) {
+  const [messages, setMessages] = useState([]); // { role: "buyer" | "agent", text }
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const bodyRef = useRef(null);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, loading]);
+
+  async function send(text) {
+    const q = (text ?? input).trim();
+    if (!q || loading) return;
+    const history = messages.map((m) => ({ role: m.role === "buyer" ? "user" : "assistant", text: m.text }));
+    setMessages((prev) => [...prev, { role: "buyer", text: q }]);
+    setInput("");
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: q, history }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      setMessages((prev) => [...prev, { role: "agent", text: data.reply }]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      {messages.length === 0 && !loading ? (
+        <p className="empty" style={{ padding: "0 0 16px", margin: 0 }}>{emptyText}</p>
+      ) : (
+        <div className="chat-area" ref={bodyRef} style={{ minHeight: "80px", maxHeight: "320px" }}>
+          {messages.map((m, i) => (
+            <div key={i} className={"msg " + m.role}>{m.text}</div>
+          ))}
+          {loading && <div className="thinking">Thinking...</div>}
+        </div>
+      )}
+
+      {error && <div className="error-box">{error}</div>}
+
+      {messages.length === 0 && suggestions && (
+        <div className="suggest-row">
+          {suggestions.map((s) => (
+            <button key={s} type="button" className="suggest-chip" onClick={() => send(s)}>{s}</button>
+          ))}
+        </div>
+      )}
+
+      <form
+        className="chat-input-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={placeholder} />
+        <button className="btn" type="submit" disabled={loading}>Send</button>
+      </form>
+    </>
+  );
+}
+
+function SellerAssistantCard() {
+  return (
+    <div className="card">
+      <h3 style={{ fontFamily: "Fraunces, serif", fontSize: "16px", margin: "0 0 4px" }}>🤖 Ask AI about your business</h3>
+      <p className="panel-sub" style={{ margin: "0 0 16px" }}>
+        Ask about your win rate, negotiation rules, revenue, or anything else on this dashboard.
+      </p>
+      <AssistantChat
+        endpoint="/api/assistant/seller"
+        placeholder="e.g. Why is my win rate low?"
+        emptyText="Ask a question about your deals, rules, or revenue — grounded in your real numbers."
+        suggestions={["Why is my win rate low?", "Which rule should I loosen?", "Am I giving away too much margin?"]}
+      />
+    </div>
+  );
+}
+
+function FloatingBuyerAssistant() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="floating-assistant">
+      {open && (
+        <div className="floating-assistant-panel">
+          <div className="floating-assistant-head">
+            <span>🤖 NegotiAI Help</span>
+            <button className="close-btn" onClick={() => setOpen(false)} aria-label="Close chat">✕</button>
+          </div>
+          <div className="floating-assistant-body">
+            <AssistantChat
+              endpoint="/api/assistant/buyer"
+              placeholder="Ask a question..."
+              emptyText="Ask me how quotes, negotiation, or invoices work — or about your own orders."
+              suggestions={["How does negotiation work?", "Where do I see my invoices?", "How many active deals do I have?"]}
+            />
+          </div>
+        </div>
+      )}
+      <button className="floating-assistant-btn" onClick={() => setOpen((o) => !o)} aria-label="Open help chat">
+        {open ? "✕" : "💬"}
+      </button>
+    </div>
   );
 }
 
@@ -3029,6 +3543,7 @@ function DealIntelligence() {
         <div className="card"><p className="empty" style={{ padding: "8px 0" }}>
           No deals yet. Once buyers request quotes and negotiate with your agent, this dashboard fills in automatically.
         </p></div>
+        <SellerAssistantCard />
       </div>
     );
   }
@@ -3115,6 +3630,8 @@ function DealIntelligence() {
           Buyers push hardest here — worth reviewing its price and discount tiers in Seller Setup.
         </div>
       )}
+
+      <SellerAssistantCard />
     </div>
   );
 }
@@ -3298,6 +3815,91 @@ function AuditLogTab() {
   );
 }
 
+function ProfilePage({ user, theme, onToggleTheme }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  async function submitPasswordChange(e) {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("New password and confirmation don't match.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to change password");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setSaved(true);
+      showToast("Password updated");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="main">
+      <h2 className="panel-title">Profile</h2>
+      <p className="panel-sub">Your account details and preferences.</p>
+
+      <div className="card">
+        <h3 style={{ fontFamily: "Fraunces, serif", fontSize: "16px", margin: "0 0 16px" }}>Account</h3>
+        <div className="quote-line"><span>{user.role === "seller" ? "Company / seller name" : "Company / name"}</span><span>{user.name}</span></div>
+        <div className="quote-line"><span>Username</span><span>{user.username}</span></div>
+        <div className="quote-line"><span>Role</span><span style={{ textTransform: "capitalize" }}>{user.role}</span></div>
+        <div className="quote-line"><span>Mobile</span><span>{user.mobile || "Not set"}</span></div>
+        <div className="quote-line"><span>Email</span><span>{user.email || "Not set"}</span></div>
+      </div>
+
+      <div className="card">
+        <h3 style={{ fontFamily: "Fraunces, serif", fontSize: "16px", margin: "0 0 16px" }}>Appearance</h3>
+        <div className="quote-line">
+          <span>Theme</span>
+          <button type="button" className="btn ghost" style={{ padding: "6px 16px" }} onClick={onToggleTheme}>
+            {theme === "dark" ? "☀️ Switch to light" : "🌙 Switch to dark"}
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 style={{ fontFamily: "Fraunces, serif", fontSize: "16px", margin: "0 0 16px" }}>Change Password</h3>
+        <form onSubmit={submitPasswordChange}>
+          <label>Current password</label>
+          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" required />
+          <label>New password</label>
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" required />
+          <label>Confirm new password</label>
+          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" required />
+          {error && <div className="error-box">{error}</div>}
+          {saved && <p style={{ color: "var(--success)", fontSize: "13px" }}>Password updated successfully.</p>}
+          <button className="btn" type="submit" disabled={saving} style={{ marginTop: "8px" }}>
+            {saving ? "Saving..." : "Update Password"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [user, setUser] = useState(undefined); // undefined = checking, null = logged out
   const [authMode, setAuthMode] = useState(null); // null = landing page, "login" | "signup" = auth screen
@@ -3310,6 +3912,16 @@ function App() {
   const [deals, setDeals] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [messagesDealId, setMessagesDealId] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  }
 
   async function loadConversations() {
     const res = await fetch("/api/conversations");
@@ -3334,6 +3946,13 @@ function App() {
     if (!res.ok) return;
     const data = await res.json();
     setDeals(data.deals || []);
+  }
+
+  // Merges a single deal we already fetched (e.g. right after a negotiate
+  // turn) into the list in place — avoids a full /api/deals round trip just
+  // to refresh one row's "X% off" preview.
+  function patchDeal(id, patch) {
+    setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
   }
 
   async function checkSession() {
@@ -3451,11 +4070,21 @@ function App() {
     <div className="app">
       <style>{STYLES}</style>
       <ToastHost />
-      <Topbar user={user} tab={tab} setTab={setTab} onLogout={handleLogout} newOrderCount={newOrderCount} unreadMessages={unreadMessages} />
+      <Topbar
+        user={user}
+        tab={tab}
+        setTab={setTab}
+        onLogout={handleLogout}
+        newOrderCount={newOrderCount}
+        unreadMessages={unreadMessages}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onOpenProfile={() => setTab("profile")}
+      />
       {tab === "setup" && <SellerSetup catalog={catalog} rules={rules} shopDescription={shopDescription} waitCounts={waitCounts} onSaved={loadSetup} />}
       {tab === "rfq" && <RFQForm onQuoteCreated={handleQuoteCreated} />}
       {tab === "negotiate" && (
-        <NegotiationChat deals={deals} dealId={activeDealId} onSelectDeal={setActiveDealId} refreshDeals={loadDeals} />
+        <NegotiationChat deals={deals} dealId={activeDealId} onSelectDeal={setActiveDealId} onDealPatched={patchDeal} />
       )}
       {tab === "pipeline" && <Pipeline deals={deals} refresh={loadDeals} onMessage={openMessages} />}
       {tab === "orders" && <Pipeline deals={deals} refresh={loadDeals} readOnly onReorder={handleReorder} onMessage={openMessages} />}
@@ -3463,6 +4092,8 @@ function App() {
       {tab === "insights" && <DealIntelligence />}
       {tab === "finance" && <FinanceTab />}
       {tab === "audit" && <AuditLogTab />}
+      {tab === "profile" && <ProfilePage user={user} theme={theme} onToggleTheme={toggleTheme} />}
+      {user.role === "buyer" && <FloatingBuyerAssistant />}
     </div>
   );
 }

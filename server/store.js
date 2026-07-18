@@ -188,17 +188,19 @@ function rowToProduct(row) {
     name: row.name,
     base_price: Number(row.base_price),
     stock: Number(row.stock),
+    category: row.category || "Other",
   };
 }
 
-async function addProduct(sellerId, { sku, name, base_price, stock }) {
+async function addProduct(sellerId, { sku, name, base_price, stock, category }) {
   const id = crypto.randomUUID();
   const finalSku = sku && sku.trim() ? sku.trim() : `SKU-${id.slice(0, 6).toUpperCase()}`;
+  const finalCategory = category && category.trim() ? category.trim() : "Other";
   await db.query(
-    "INSERT INTO products (id, seller_id, sku, name, base_price, stock) VALUES ($1, $2, $3, $4, $5, $6)",
-    [id, sellerId, finalSku, name.trim(), Number(base_price), Number(stock)]
+    "INSERT INTO products (id, seller_id, sku, name, base_price, stock, category) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    [id, sellerId, finalSku, name.trim(), Number(base_price), Number(stock), finalCategory]
   );
-  return { id, seller_id: sellerId, sku: finalSku, name: name.trim(), base_price: Number(base_price), stock: Number(stock) };
+  return { id, seller_id: sellerId, sku: finalSku, name: name.trim(), base_price: Number(base_price), stock: Number(stock), category: finalCategory };
 }
 
 async function updateProduct(sellerId, productId, updates) {
@@ -209,15 +211,16 @@ async function updateProduct(sellerId, productId, updates) {
   const base_price = updates.base_price !== undefined ? Number(updates.base_price) || Number(existing.base_price) : Number(existing.base_price);
   const stock = updates.stock !== undefined ? Number(updates.stock) : Number(existing.stock);
   const name = updates.name !== undefined ? updates.name : existing.name;
+  const category = updates.category !== undefined && updates.category ? updates.category : (existing.category || "Other");
 
-  await db.query("UPDATE products SET base_price = $1, stock = $2, name = $3 WHERE id = $4", [base_price, stock, name, productId]);
+  await db.query("UPDATE products SET base_price = $1, stock = $2, name = $3, category = $4 WHERE id = $5", [base_price, stock, name, category, productId]);
 
   // Restock event: if the product was out and now has stock, fulfill any
   // waiting notifications so buyers get a back-in-stock alert.
   if (Number(existing.stock) <= 0 && stock > 0) {
     await fulfillStockNotifications(productId);
   }
-  return rowToProduct({ ...existing, base_price, stock, name });
+  return rowToProduct({ ...existing, base_price, stock, name, category });
 }
 
 // --- Out-of-stock waitlist / lead capture ---
@@ -475,21 +478,26 @@ async function confirmDealAndDeductStock(id) {
   const deal = await getDeal(id);
   if (!deal) return null;
 
+  // The three writes below don't depend on each other's results, so they run
+  // concurrently instead of as five sequential round trips (select product,
+  // update product, update deal, insert audit row, re-fetch deal) — this is
+  // the final "deal confirmed" step of a negotiation, so its latency is felt
+  // directly at the most visible moment of the flow.
+  const writes = [
+    db.query(
+      "UPDATE deals SET status = 'confirmed', pending_confirmation = false, stock_deducted = true WHERE id = $1",
+      [id]
+    ),
+    logAuditEvent(id, deal.seller_id, "deal_confirmed", `Deal confirmed at ₹${deal.quote.total} — stock deducted by ${deal.quantity} units`, "system"),
+  ];
   if (!deal.stock_deducted && deal.product_id) {
-    const productRes = await db.query("SELECT * FROM products WHERE id = $1", [deal.product_id]);
-    const product = productRes.rows[0];
-    if (product) {
-      const newStock = Math.max(0, Number(product.stock) - deal.quantity);
-      await db.query("UPDATE products SET stock = $1 WHERE id = $2", [newStock, deal.product_id]);
-    }
+    // GREATEST(0, stock - qty) does the floor-at-zero clamp server-side, so
+    // no separate SELECT is needed before the UPDATE.
+    writes.push(db.query("UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2", [deal.quantity, deal.product_id]));
   }
+  await Promise.all(writes);
 
-  await db.query(
-    "UPDATE deals SET status = 'confirmed', pending_confirmation = false, stock_deducted = true WHERE id = $1",
-    [id]
-  );
-  await logAuditEvent(id, deal.seller_id, "deal_confirmed", `Deal confirmed at ₹${deal.quote.total} — stock deducted by ${deal.quantity} units`, "system");
-  return getDeal(id);
+  return { ...deal, status: "confirmed", pending_confirmation: false, stock_deducted: true };
 }
 
 // Marks a newly-placed order as seen by the seller — clears the "new order"
@@ -499,6 +507,41 @@ async function acknowledgeDeal(id) {
   const deal = await getDeal(id);
   if (deal) await logAuditEvent(id, deal.seller_id, "order_acknowledged", "Seller acknowledged the new order", "seller");
   return deal;
+}
+
+// Appends one or more history entries AND applies deal-field updates in a
+// single read + single write. The negotiation endpoint used to chain 2-3
+// separate appendHistory/updateDeal calls per reply, each doing its own
+// extra round trip (getDeal + UPDATE + getDeal) — on a remote database that
+// added several real, user-felt seconds to every negotiation turn. This
+// collapses a full turn (buyer message + agent reply + status/quote update)
+// into one read and one write.
+async function writeDealTurn(id, { historyEntries = [], updates = {} }) {
+  const existing = await getDeal(id);
+  if (!existing) return null;
+  const at = new Date().toISOString();
+  const newHistory = [...existing.history, ...historyEntries.map((e) => ({ ...e, at }))];
+  const merged = { ...existing, ...updates, history: newHistory, last_activity_at: at };
+  await db.query(
+    `UPDATE deals SET status = $1, quote = $2, pending_confirmation = $3, invoice_number = $4, invoiced_at = $5,
+       seller_acknowledged = $6, stock_deducted = $7, payment_status = $8, paid_at = $9, history = $10, last_activity_at = $11
+     WHERE id = $12`,
+    [
+      merged.status,
+      JSON.stringify(merged.quote),
+      merged.pending_confirmation,
+      merged.invoice_number || null,
+      merged.invoiced_at || null,
+      merged.seller_acknowledged,
+      merged.stock_deducted,
+      merged.payment_status,
+      merged.paid_at || null,
+      JSON.stringify(newHistory),
+      at,
+      id,
+    ]
+  );
+  return merged;
 }
 
 async function appendHistory(id, entry) {
@@ -623,11 +666,12 @@ async function getRevenueStatsForSeller(sellerId) {
 // (the quote snapshot + negotiation history stored on each deal) — nothing
 // is estimated or faked. ---
 async function getDealIntelligenceForSeller(sellerId) {
-  const res = await db.query("SELECT status, quote, history, created_at FROM deals WHERE seller_id = $1", [sellerId]);
+  const res = await db.query("SELECT sku, status, quote, history, created_at FROM deals WHERE seller_id = $1", [sellerId]);
   const rules = await getSellerRules(sellerId);
   const maxDiscount = Number(rules.max_discount_percent) || 0;
 
   const deals = res.rows.map((row) => ({
+    sku: row.sku,
     status: row.status,
     quote: typeof row.quote === "string" ? JSON.parse(row.quote) : row.quote,
     history: typeof row.history === "string" ? JSON.parse(row.history) : row.history || [],
@@ -669,7 +713,7 @@ async function getDealIntelligenceForSeller(sellerId) {
   // Most-negotiated product (by number of negotiated deals).
   const byProduct = {};
   for (const d of negotiated) {
-    const name = (d.quote && d.quote.product_name) || "—";
+    const name = (d.quote && (d.quote.product_name || d.sku)) || "—";
     byProduct[name] = (byProduct[name] || 0) + 1;
   }
   let topProduct = null, topProductCount = 0;
@@ -820,6 +864,7 @@ module.exports = {
   acknowledgeDeal,
   appendHistory,
   getSellerTrustStats,
+  writeDealTurn,
   addDealMessage,
   getDealMessages,
   getConversationsForUser,

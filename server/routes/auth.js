@@ -32,9 +32,13 @@ function maskDestination(target, value) {
 }
 
 // POST /api/auth/signup  { username, password, role, name, email?, mobile? }
-// Requires at least one of email/mobile, then issues a verification code for
-// it instead of logging the user straight in. The session is only established
-// once the code is verified (POST /api/auth/verify-otp).
+//
+// OTP verification is TEMPORARILY DISABLED (the account is verified + logged
+// in immediately without a code) — re-enable later by restoring the "issue
+// OTP + pending_verification" block that used to live here (see
+// verifyOtp/resendOtp below, and mailer.js / store.createOtpCode /
+// store.verifyOtpCode, all still intact and unused). Mobile is still a
+// required field; only the verification step is skipped.
 async function signup(req, res) {
   const { username, password, role, name, email, mobile } = req.body;
 
@@ -47,11 +51,8 @@ async function signup(req, res) {
   if (!["buyer", "seller"].includes(role)) {
     return res.status(400).json({ error: 'role must be "buyer" or "seller"' });
   }
-  if (!mobile) {
-    return res.status(400).json({ error: "A mobile number is required" });
-  }
-  if (!/^\d{10}$/.test(String(mobile).trim())) {
-    return res.status(400).json({ error: "Mobile number must be exactly 10 digits" });
+  if (!mobile || !/^\d{10}$/.test(String(mobile).trim())) {
+    return res.status(400).json({ error: "Mobile number is required and must be exactly 10 digits" });
   }
   if (email && !/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(String(email).trim())) {
     return res.status(400).json({ error: "Email must be a Gmail address ending in @gmail.com" });
@@ -62,26 +63,9 @@ async function signup(req, res) {
       return res.status(409).json({ error: "That username is already taken" });
     }
     const user = await store.createUser({ username, password, role, name, email, mobile });
-
-    // Verify email if provided, otherwise mobile.
-    const target = email ? "email" : "mobile";
-    const destination = email ? email.trim().toLowerCase() : mobile.trim();
-    const code = await store.createOtpCode(user.id, target, destination);
-
-    // Real email delivery when SMTP is configured; otherwise demo mode.
-    // SMS isn't wired (needs a provider + DLT), so mobile is always demo mode.
-    const delivered = target === "email" ? await sendOtpEmail(destination, code, user.name) : false;
-
-    res.json({
-      pending_verification: true,
-      user_id: user.id,
-      target,
-      destination_masked: maskDestination(target, destination),
-      delivered,
-      // Only returned when we could NOT actually deliver it (demo mode). When
-      // a real email was sent, the code never leaves the server.
-      demo_code: delivered ? undefined : code,
-    });
+    await store.markUserVerified(user.id, "auto");
+    req.session.userId = user.id;
+    res.json({ user: store.toPublicUser(user) });
   } catch (err) {
     console.error(err);
     res.status(409).json({ error: err.message });
@@ -225,6 +209,28 @@ async function resetPassword(req, res) {
   }
 }
 
+// POST /api/auth/change-password  { current_password, new_password }  (requires auth)
+async function changePassword(req, res) {
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: "current_password and new_password are required" });
+    }
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    }
+    const user = await store.findUserById(req.user.id);
+    if (!store.verifyPassword(user, current_password)) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+    await store.updateUserPassword(user.id, new_password);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to change password" });
+  }
+}
+
 // Middleware: require any logged-in user
 async function requireAuth(req, res, next) {
   try {
@@ -260,6 +266,7 @@ module.exports = {
   me,
   forgotPassword,
   resetPassword,
+  changePassword,
   requireAuth,
   requireRole,
 };

@@ -8,6 +8,23 @@ function computeBulkDiscount(quantity, rules) {
   return discount;
 }
 
+// Explains why the quote came out the way it did, so the buyer isn't just
+// handed a number — this is the reasoning shown under the very first message,
+// same as every negotiation counter gets one.
+function explainBulkDiscount(quantity, discount_percent, rules) {
+  if (discount_percent === 0) {
+    const tiers = [...rules.bulk_discount_tiers].sort((a, b) => a.min_qty - b.min_qty);
+    const next = tiers.find((t) => t.min_qty > quantity);
+    return next
+      ? `No bulk discount tier applies yet at ${quantity} units — the next tier unlocks ${next.extra_discount}% off at ${next.min_qty}+ units.`
+      : `Base price applies at ${quantity} units — no bulk discount tier is configured for this quantity.`;
+  }
+  const tier = [...rules.bulk_discount_tiers]
+    .sort((a, b) => b.min_qty - a.min_qty)
+    .find((t) => quantity >= t.min_qty);
+  return `A ${discount_percent}% bulk discount applies because ${quantity} units meets the ${tier.min_qty}+ unit tier.`;
+}
+
 // POST /api/quote
 // body: { product_id, quantity, delivery_date? }
 // buyer identity comes from req.user (set by requireRole("buyer") middleware),
@@ -58,6 +75,7 @@ async function createQuote(req, res) {
     await store.appendHistory(deal.id, {
       role: "agent",
       message: `Here's your quote for ${quantity}x ${product.name}: ₹${unit_price}/unit (${discount_percent}% bulk discount applied), total ₹${total.toLocaleString("en-IN")}.`,
+      reasoning: explainBulkDiscount(quantity, discount_percent, rules),
       quote,
     });
 

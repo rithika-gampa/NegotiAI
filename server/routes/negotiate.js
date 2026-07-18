@@ -55,13 +55,24 @@ You will be given:
 1. SELLER_RULES: pricing, margins, and negotiation boundaries
 2. PRODUCT: the item being negotiated, with base price and stock
 3. CURRENT_QUOTE: the quote on the table right now
-4. CONVERSATION_HISTORY: the negotiation so far
-5. ROUND: how many buyer messages have been sent in this negotiation so far (1 = their first message)
-6. BUYER_MESSAGE: the latest message from the buyer
+4. BUYER_NAME: the buyer's company/account name
+5. CONVERSATION_HISTORY: the negotiation so far
+6. ROUND: how many buyer messages have been sent in this negotiation so far (1 = their first message)
+7. BUYER_MESSAGE: the latest message from the buyer
 
 Your job is to respond with a decision that stays strictly within SELLER_RULES.
 You must never approve a discount, payment term, or condition that violates the
 seller's minimum margin or maximum discount settings.
+
+PRIVACY — CRITICAL: You may use BUYER_NAME to personalize your reply (e.g.
+"Thanks, Meridian Retail — here's what I can do..."), but you must never
+disclose personal or contact information in any message: no email addresses,
+phone/mobile numbers, physical addresses, payment details, login credentials,
+or any other buyer's or seller's data. Discuss only the product, price, and
+terms of THIS deal. If the buyer asks for the seller's contact details,
+someone else's information, or anything outside the deal itself, politely
+decline and redirect to the product/pricing conversation — do not explain
+why, just stay on-topic.
 
 INTERPRETING THE BUYER'S MESSAGE
 - If the buyer's message is a plain acceptance — "ok", "deal", "agreed", "sounds
@@ -100,6 +111,18 @@ NEGOTIATING LIKE A REAL PERSON, NOT A TOKEN-DISCOUNT MACHINE
   a critical error. In that case, action should be "accept" at the current
   quote (or better for the seller, if the buyer's number is genuinely a
   higher total), never a lower one.
+- CRITICAL: never give the buyer MORE discount than they explicitly asked for
+  in their current message. If the buyer names a specific target (e.g. "can
+  you do 10% off", "11% off?", a specific unit price or total), treat that
+  number as their ask — not as an invitation to jump straight to whatever
+  maximum SELLER_RULES would technically allow. If their ask is within
+  SELLER_RULES, ACCEPT it at (or very close to) exactly what they asked for.
+  Only go lower for the seller (i.e. discount the buyer more than they asked)
+  if the buyer's message plainly signals they want the best possible price
+  with no specific number ("what's your best price?", "your best offer?").
+  Jumping to the seller's maximum allowed discount when the buyer named a
+  smaller, already-acceptable number is a critical error — it hands away
+  margin unprompted and looks erratic to the buyer.
 - Only escalate for genuinely out-of-bounds asks (below-cost pricing, unusual
   custom contract terms) — not just because the buyer pushed back once.
 
@@ -145,10 +168,14 @@ async function negotiate(req, res) {
       return res.status(403).json({ error: "Not your deal" });
     }
 
-    const product = await store.findProductById(deal.product_id);
-    const rules = await store.getSellerRules(deal.seller_id);
+    // Independent reads — run concurrently instead of one after another;
+    // each round trip to a remote database is real, felt latency.
+    const [product, rules] = await Promise.all([
+      store.findProductById(deal.product_id),
+      store.getSellerRules(deal.seller_id),
+    ]);
 
-    await store.appendHistory(deal_id, { role: "buyer", message: buyer_message });
+    const buyerEntry = { role: "buyer", message: buyer_message };
 
     // --- Deterministic plain-affirmative handling (no LLM call) ---
     if (isPlainAffirmative(buyer_message)) {
@@ -161,15 +188,20 @@ async function negotiate(req, res) {
           `at ${formatINR(q.unit_price)}/unit (${q.discount_percent}% discount), ` +
           `totaling ${formatINR(q.total)}. Shall I go ahead and confirm this deal?`;
 
-        await store.appendHistory(deal_id, {
-          role: "agent",
-          message: confirmMessage,
-          reasoning: "Buyer sent a plain acceptance — asking for explicit confirmation of the exact price before finalizing, rather than closing the deal on an ambiguous 'ok'.",
-          quote: q,
-          action: "confirm_pending",
-          provider: "system",
+        await store.writeDealTurn(deal_id, {
+          historyEntries: [
+            buyerEntry,
+            {
+              role: "agent",
+              message: confirmMessage,
+              reasoning: "Buyer sent a plain acceptance — asking for explicit confirmation of the exact price before finalizing, rather than closing the deal on an ambiguous 'ok'.",
+              quote: q,
+              action: "confirm_pending",
+              provider: "system",
+            },
+          ],
+          updates: { status: "negotiating", pending_confirmation: true },
         });
-        await store.updateDeal(deal_id, { status: "negotiating", pending_confirmation: true });
 
         return res.json({
           deal_id,
@@ -187,15 +219,20 @@ async function negotiate(req, res) {
         `Deal confirmed. We'll proceed with ${q.quantity} x ${q.product_name || deal.sku} ` +
         `at ${formatINR(q.unit_price)}/unit, totaling ${formatINR(q.total)}.`;
 
-      await store.appendHistory(deal_id, {
-        role: "agent",
-        message: closeMessage,
-        reasoning: "Buyer explicitly confirmed the restated price a second time, so the deal is finalized.",
-        quote: q,
-        action: "accept",
-        provider: "system",
+      await store.writeDealTurn(deal_id, {
+        historyEntries: [
+          buyerEntry,
+          {
+            role: "agent",
+            message: closeMessage,
+            reasoning: "Buyer explicitly confirmed the restated price a second time, so the deal is finalized.",
+            quote: q,
+            action: "accept",
+            provider: "system",
+          },
+        ],
+        updates: { quote: q },
       });
-      await store.updateDeal(deal_id, { quote: q });
       await store.confirmDealAndDeductStock(deal_id);
 
       return res.json({
@@ -222,15 +259,20 @@ async function negotiate(req, res) {
           `I won't ask you to pay more than necessary. Confirming at ${q.quantity} x ${q.product_name || deal.sku} ` +
           `at ${formatINR(q.unit_price)}/unit, totaling ${formatINR(q.total)}. Shall I go ahead and confirm this deal?`;
 
-        await store.appendHistory(deal_id, {
-          role: "agent",
-          message: confirmMessage,
-          reasoning: `Buyer's offer (≈${formatINR(impliedTotal)}) already meets or exceeds the current quote total of ${formatINR(q.total)}, so the price is held at the current quote rather than negotiated down further.`,
-          quote: q,
-          action: "confirm_pending",
-          provider: "system",
+        await store.writeDealTurn(deal_id, {
+          historyEntries: [
+            buyerEntry,
+            {
+              role: "agent",
+              message: confirmMessage,
+              reasoning: `Buyer's offer (≈${formatINR(impliedTotal)}) already meets or exceeds the current quote total of ${formatINR(q.total)}, so the price is held at the current quote rather than negotiated down further.`,
+              quote: q,
+              action: "confirm_pending",
+              provider: "system",
+            },
+          ],
+          updates: { status: "negotiating", pending_confirmation: true },
         });
-        await store.updateDeal(deal_id, { status: "negotiating", pending_confirmation: true });
 
         return res.json({
           deal_id,
@@ -244,8 +286,13 @@ async function negotiate(req, res) {
     }
 
     // Any non-affirmative message cancels a pending confirmation and goes
-    // through normal negotiation via the LLM.
-    await store.updateDeal(deal_id, { status: "negotiating", pending_confirmation: false });
+    // through normal negotiation via the LLM. Written now (before the LLM
+    // call) so that if every provider fails below, the deal is still left in
+    // a consistent, non-stale-pending state.
+    await store.writeDealTurn(deal_id, {
+      historyEntries: [buyerEntry],
+      updates: { status: "negotiating", pending_confirmation: false },
+    });
 
     const round = deal.history.filter((h) => h.role === "buyer").length + 1;
 
@@ -253,6 +300,7 @@ async function negotiate(req, res) {
 SELLER_RULES: ${JSON.stringify(rules)}
 PRODUCT: ${JSON.stringify(product)}
 CURRENT_QUOTE: ${JSON.stringify(deal.quote)}
+BUYER_NAME: ${deal.buyer_name}
 CONVERSATION_HISTORY: ${JSON.stringify(deal.history.slice(0, -1))}
 ROUND: ${round}
 BUYER_MESSAGE: ${buyer_message}
@@ -274,14 +322,25 @@ BUYER_MESSAGE: ${buyer_message}
 
     const parsed = JSON.parse(stripJsonFences(rawText));
 
-    await store.appendHistory(deal_id, {
+    // The model is only asked to return pricing fields (see SYSTEM_PROMPT's
+    // output schema) — it never echoes product_name/base_price. Carry those
+    // forward from the existing quote so they aren't lost after the first
+    // negotiation exchange; invoices, the negotiation UI, and deal-intelligence
+    // analytics all read deal.quote.product_name / base_price.
+    parsed.quote = {
+      ...parsed.quote,
+      product_name: deal.quote.product_name,
+      base_price: deal.quote.base_price,
+    };
+
+    const agentEntry = {
       role: "agent",
       message: parsed.message_to_buyer,
       reasoning: parsed.reasoning,
       quote: parsed.quote,
       action: parsed.action,
       provider: usedProvider,
-    });
+    };
 
     // Even if the LLM decides "accept" directly (e.g. buyer explicitly typed
     // out full agreement terms rather than a bare "ok"), route it through the
@@ -292,15 +351,20 @@ BUYER_MESSAGE: ${buyer_message}
         `at ${formatINR(parsed.quote.unit_price)}/unit (${parsed.quote.discount_percent}% discount), ` +
         `totaling ${formatINR(parsed.quote.total)}. Shall I go ahead and confirm this deal?`;
 
-      await store.appendHistory(deal_id, {
-        role: "agent",
-        message: confirmMessage,
-        reasoning: "Restating exact terms and requiring explicit confirmation before finalizing.",
-        quote: parsed.quote,
-        action: "confirm_pending",
-        provider: "system",
+      await store.writeDealTurn(deal_id, {
+        historyEntries: [
+          agentEntry,
+          {
+            role: "agent",
+            message: confirmMessage,
+            reasoning: "Restating exact terms and requiring explicit confirmation before finalizing.",
+            quote: parsed.quote,
+            action: "confirm_pending",
+            provider: "system",
+          },
+        ],
+        updates: { quote: parsed.quote, status: "negotiating", pending_confirmation: true },
       });
-      await store.updateDeal(deal_id, { quote: parsed.quote, status: "negotiating", pending_confirmation: true });
 
       return res.json({
         deal_id,
@@ -313,7 +377,10 @@ BUYER_MESSAGE: ${buyer_message}
     }
 
     const newStatus = parsed.action === "escalate" ? "negotiating" : "negotiating";
-    await store.updateDeal(deal_id, { quote: parsed.quote, status: newStatus, pending_confirmation: false });
+    await store.writeDealTurn(deal_id, {
+      historyEntries: [agentEntry],
+      updates: { quote: parsed.quote, status: newStatus, pending_confirmation: false },
+    });
 
     res.json({ deal_id, ...parsed, status: newStatus, provider: usedProvider });
   } catch (err) {

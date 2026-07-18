@@ -21,11 +21,11 @@ const DEMO_SELLERS = [
     name: "Saraswati Stationery Co.",
     description: "Office stationery and school supplies in bulk — notebooks, pens, copier paper, and desk essentials.",
     products: [
-      { sku: "STN-001", name: "Spiral Notebook A5 (pack of 12)", base_price: 480, stock: 5000 },
-      { sku: "STN-002", name: "Ball Pen Blue (box of 50)", base_price: 350, stock: 8000 },
-      { sku: "STN-003", name: "A4 Copier Paper (500 sheets)", base_price: 280, stock: 12000 },
-      { sku: "STN-004", name: "Stapler + 1000 Pins Set", base_price: 220, stock: 3000 },
-      { sku: "STN-005", name: "Whiteboard Marker (pack of 10)", base_price: 260, stock: 4000 },
+      { sku: "STN-001", name: "Spiral Notebook A5 (pack of 12)", base_price: 480, stock: 5000, category: "Stationery" },
+      { sku: "STN-002", name: "Ball Pen Blue (box of 50)", base_price: 350, stock: 8000, category: "Stationery" },
+      { sku: "STN-003", name: "A4 Copier Paper (500 sheets)", base_price: 280, stock: 12000, category: "Stationery" },
+      { sku: "STN-004", name: "Stapler + 1000 Pins Set", base_price: 220, stock: 3000, category: "Stationery" },
+      { sku: "STN-005", name: "Whiteboard Marker (pack of 10)", base_price: 260, stock: 4000, category: "Stationery" },
     ],
   },
   {
@@ -33,11 +33,11 @@ const DEMO_SELLERS = [
     name: "GreenBasket Wholesale Grocery",
     description: "Wholesale grocery staples for retailers and canteens — rice, oils, pulses, sugar, and tea.",
     products: [
-      { sku: "GRC-001", name: "Basmati Rice (25 kg bag)", base_price: 2400, stock: 600 },
-      { sku: "GRC-002", name: "Sunflower Oil (15 L tin)", base_price: 2100, stock: 450 },
-      { sku: "GRC-003", name: "Toor Dal (10 kg pack)", base_price: 1250, stock: 900 },
-      { sku: "GRC-004", name: "Sugar (50 kg sack)", base_price: 2050, stock: 300 },
-      { sku: "GRC-005", name: "Assam CTC Tea (5 kg pack)", base_price: 1600, stock: 700 },
+      { sku: "GRC-001", name: "Basmati Rice (25 kg bag)", base_price: 2400, stock: 600, category: "Grocery" },
+      { sku: "GRC-002", name: "Sunflower Oil (15 L tin)", base_price: 2100, stock: 450, category: "Grocery" },
+      { sku: "GRC-003", name: "Toor Dal (10 kg pack)", base_price: 1250, stock: 900, category: "Grocery" },
+      { sku: "GRC-004", name: "Sugar (50 kg sack)", base_price: 2050, stock: 300, category: "Grocery" },
+      { sku: "GRC-005", name: "Assam CTC Tea (5 kg pack)", base_price: 1600, stock: 700, category: "Grocery" },
     ],
   },
   {
@@ -45,10 +45,10 @@ const DEMO_SELLERS = [
     name: "BrightVolt Electricals",
     description: "Electrical goods and fittings — LED lighting, wiring, extension boards, and fans at trade prices.",
     products: [
-      { sku: "ELC-001", name: "LED Bulb 9W (box of 20)", base_price: 1500, stock: 2500 },
-      { sku: "ELC-002", name: "6-Socket Extension Board", base_price: 420, stock: 1800 },
-      { sku: "ELC-003", name: "Copper Wire Coil (90 m)", base_price: 2800, stock: 650 },
-      { sku: "ELC-004", name: "Ceiling Fan 1200 mm", base_price: 1450, stock: 400 },
+      { sku: "ELC-001", name: "LED Bulb 9W (box of 20)", base_price: 1500, stock: 2500, category: "Electricals" },
+      { sku: "ELC-002", name: "6-Socket Extension Board", base_price: 420, stock: 1800, category: "Electricals" },
+      { sku: "ELC-003", name: "Copper Wire Coil (90 m)", base_price: 2800, stock: 650, category: "Electricals" },
+      { sku: "ELC-004", name: "Ceiling Fan 1200 mm", base_price: 1450, stock: 400, category: "Electricals" },
     ],
   },
   {
@@ -56,11 +56,47 @@ const DEMO_SELLERS = [
     name: "Tandoor Foodservice Supplies",
     description: "Bulk ingredients and food-service supplies for restaurants, canteens, and caterers — spices, dairy, frozen items, and packaging.",
     products: [
-      { sku: "FDS-001", name: "Mixed Spice Masala (5 kg pack)", base_price: 1800, stock: 800 },
-      { sku: "FDS-002", name: "Tomato Puree (catering tin, 3 kg)", base_price: 620, stock: 1200 },
-      { sku: "FDS-003", name: "Paneer (bulk, 10 kg block)", base_price: 3400, stock: 350 },
-      { sku: "FDS-004", name: "Frozen French Fries (10 kg carton)", base_price: 2100, stock: 500 },
-      { sku: "FDS-005", name: "Disposable Takeaway Containers (pack of 500)", base_price: 950, stock: 2000 },
+      { sku: "FDS-001", name: "Mixed Spice Masala (5 kg pack)", base_price: 1800, stock: 800, category: "Food & Catering" },
+      { sku: "FDS-002", name: "Tomato Puree (catering tin, 3 kg)", base_price: 620, stock: 1200, category: "Food & Catering" },
+      { sku: "FDS-003", name: "Paneer (bulk, 10 kg block)", base_price: 3400, stock: 350, category: "Food & Catering" },
+      { sku: "FDS-004", name: "Frozen French Fries (10 kg carton)", base_price: 2100, stock: 500, category: "Food & Catering" },
+      { sku: "FDS-005", name: "Disposable Takeaway Containers (pack of 500)", base_price: 950, stock: 2000, category: "Food & Catering" },
+    ],
+  },
+  {
+    username: "safepack_solutions",
+    name: "SafePack Packaging Solutions",
+    description: "Packaging materials in bulk — corrugated boxes, bubble wrap, tape, and pallets for shipping and storage.",
+    products: [
+      { sku: "SPK-001", name: "Corrugated Box, Large (pack of 50)", base_price: 1850, stock: 1500, category: "Packaging" },
+      { sku: "SPK-002", name: "Bubble Wrap Roll (100 m)", base_price: 1200, stock: 900, category: "Packaging" },
+      { sku: "SPK-003", name: "Industrial Stretch Film Roll", base_price: 680, stock: 1200, category: "Packaging" },
+      { sku: "SPK-004", name: "Packing Tape (pack of 36 rolls)", base_price: 1450, stock: 800, category: "Packaging" },
+      { sku: "SPK-005", name: "Wooden Pallet, Standard", base_price: 950, stock: 600, category: "Packaging" },
+    ],
+  },
+  {
+    username: "urbannest_furniture",
+    name: "Urban Nest Office Furniture",
+    description: "Office furniture in bulk — ergonomic chairs, desks, filing cabinets, and modular workstations for growing teams.",
+    products: [
+      { sku: "FUR-001", name: "Ergonomic Office Chair", base_price: 6500, stock: 250, category: "Furniture" },
+      { sku: "FUR-002", name: "Work Desk (4x2 ft)", base_price: 4200, stock: 300, category: "Furniture" },
+      { sku: "FUR-003", name: "Steel Filing Cabinet (4-drawer)", base_price: 8900, stock: 150, category: "Furniture" },
+      { sku: "FUR-004", name: "Modular Workstation (2-seater)", base_price: 15500, stock: 80, category: "Furniture" },
+      { sku: "FUR-005", name: "Visitor Chair (pack of 4)", base_price: 5200, stock: 200, category: "Furniture" },
+    ],
+  },
+  {
+    username: "vastra_textiles",
+    name: "Vastra Textile Traders",
+    description: "Bulk textiles and apparel — cotton fabric rolls, uniforms, and hotel-grade linens for retailers and institutions.",
+    products: [
+      { sku: "TXT-001", name: "Cotton Fabric Roll (100 m)", base_price: 9500, stock: 400, category: "Textiles" },
+      { sku: "TXT-002", name: "School Uniform Set (pack of 20)", base_price: 7800, stock: 350, category: "Textiles" },
+      { sku: "TXT-003", name: "Cotton T-Shirts, Bulk (pack of 50)", base_price: 6200, stock: 500, category: "Textiles" },
+      { sku: "TXT-004", name: "Hotel-Grade Bedsheet Set (pack of 10)", base_price: 8400, stock: 300, category: "Textiles" },
+      { sku: "TXT-005", name: "Curtain Fabric Roll (50 m)", base_price: 5600, stock: 250, category: "Textiles" },
     ],
   },
 ];
@@ -69,18 +105,24 @@ async function seedDemoData() {
   await db.query("DELETE FROM products WHERE sku = ANY($1)", [OLD_STARTER_SKUS]);
 
   for (const seller of DEMO_SELLERS) {
-    const existing = await store.findUserByUsername(seller.username);
-    if (!existing) {
-      const user = await store.createUser({
+    let sellerUser = await store.findUserByUsername(seller.username);
+    if (!sellerUser) {
+      sellerUser = await store.createUser({
         username: seller.username,
         password: DEMO_PASSWORD,
         role: "seller",
         name: seller.name,
       });
       for (const p of seller.products) {
-        await store.addProduct(user.id, p);
+        await store.addProduct(sellerUser.id, p);
       }
       console.log(`Seeded demo seller: ${seller.name} (${seller.username})`);
+    }
+
+    // Backfill category on already-seeded products (covers demo data created
+    // before the category column existed) — matched by SKU, safe to re-run.
+    for (const p of seller.products) {
+      await db.query("UPDATE products SET category = $1 WHERE seller_id = $2 AND sku = $3", [p.category, sellerUser.id, p.sku]);
     }
 
     // Fill in the shop description if it's empty — upgrades demo sellers

@@ -1,4 +1,5 @@
 const store = require("../store");
+const { callWithFallback } = require("../llmClient");
 
 async function listDeals(req, res) {
   try {
@@ -165,7 +166,7 @@ async function updateSetup(req, res) {
     const { catalog, shop_description, ...rulesUpdate } = req.body;
     if (catalog) {
       for (const p of catalog) {
-        if (p.id) await store.updateProduct(req.user.id, p.id, { base_price: p.base_price, stock: p.stock });
+        if (p.id) await store.updateProduct(req.user.id, p.id, { base_price: p.base_price, stock: p.stock, category: p.category });
       }
     }
     if (typeof shop_description === "string") {
@@ -186,15 +187,44 @@ async function updateSetup(req, res) {
 // POST /api/products — add a brand-new product to the seller's own catalog
 async function addProduct(req, res) {
   try {
-    const { sku, name, base_price, stock } = req.body;
+    const { sku, name, base_price, stock, category } = req.body;
     if (!name || base_price === undefined || stock === undefined) {
       return res.status(400).json({ error: "name, base_price, and stock are required" });
     }
-    const product = await store.addProduct(req.user.id, { sku, name, base_price, stock });
+    const product = await store.addProduct(req.user.id, { sku, name, base_price, stock, category });
     res.json({ product, catalog: await store.getProductsForSeller(req.user.id) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to add product" });
+  }
+}
+
+// POST /api/setup/generate-description — AI drafts a shop description from
+// the seller's current catalog, so sellers don't have to write marketing
+// copy themselves. Purely a writing aid: the seller reviews/edits the
+// result and only it's saved when they click "Save Changes" like normal.
+async function generateShopDescription(req, res) {
+  try {
+    const catalog = await store.getProductsForSeller(req.user.id);
+    if (catalog.length === 0) {
+      return res.status(400).json({ error: "Add at least one product first, so the AI has something to describe." });
+    }
+    const productNames = catalog.map((p) => p.name).join(", ");
+    const result = await callWithFallback({
+      systemPrompt:
+        "You write concise, factual B2B marketplace shop descriptions. Output plain text only — no quotes, " +
+        "no markdown, no emojis, no marketing fluff. One sentence, under 160 characters.",
+      userContent:
+        `Seller name: ${req.user.name}\nProducts sold: ${productNames}\n\n` +
+        `Write one short, professional shop description for a B2B marketplace listing, summarizing what this ` +
+        `seller sells in bulk. Output ONLY the description text.`,
+    });
+    let description = result.text.trim().replace(/^["']+|["']+$/g, "");
+    if (description.length > 200) description = description.slice(0, 200);
+    res.json({ description, provider: result.provider });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: "AI description generation failed — try again, or write it manually." });
   }
 }
 
@@ -370,6 +400,7 @@ module.exports = {
   getCatalogAndRules,
   updateSetup,
   addProduct,
+  generateShopDescription,
   listAllProducts,
   acknowledgeDeal,
   getDealMessages,
