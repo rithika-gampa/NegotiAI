@@ -15,7 +15,10 @@ const PROVIDER_CONFIG = {
   },
   groq: {
     envKey: "GROQ_API_KEY",
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    // llama-3.3-70b-versatile / llama-3.1-8b-instant were moved to Groq's
+    // enterprise-only tier in June 2026 — gpt-oss-120b is the current
+    // general-purpose default for free/developer accounts.
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
     url: "https://api.groq.com/openai/v1/chat/completions",
     call: callOpenAICompatible,
   },
@@ -63,7 +66,12 @@ async function callOpenAICompatible(config, apiKey, { systemPrompt, userContent 
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
-      max_tokens: 500,
+      // Reasoning models (e.g. Groq's gpt-oss-*) spend real completion
+      // tokens on hidden chain-of-thought before the visible JSON answer —
+      // 500 was tuned for plain instruct models and truncated gpt-oss
+      // mid-JSON on the full negotiation prompt. 2000 gives it room for
+      // both the reasoning and the actual reply.
+      max_tokens: 2000,
     }),
   });
   if (!res.ok) throw new Error(`${config.model} error: ${await res.text()}`);
